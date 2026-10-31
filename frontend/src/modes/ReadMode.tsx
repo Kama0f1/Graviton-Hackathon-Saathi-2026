@@ -7,7 +7,7 @@ import Segmented from '../components/Segmented'
 import Icon from '../components/Icon'
 import { useCamera } from '../core/camera'
 import { api, ApiError, type MoneyMode, type ReadResult } from '../core/api'
-import { say } from '../core/speech'
+import { say, stop } from '../core/speech'
 import { haptics } from '../core/haptics'
 import { startGuidance } from '../core/guidance'
 import { fromMoney, fromRead, fromSpeech, money, type ResultSrc, src } from '../core/result'
@@ -141,21 +141,25 @@ export default function ReadMode({ command, shared }: {
     setQr(true)
     stopQr.current = startQrScan(video, (raw) => {
       setQr(false); stopQr.current = null
+      stop() // drop the rest of "looking for a QR code" so it does not come back after the answer
       const info = parseQr(raw)
       const bill = lastRead.current?.bill
       const shop = bill?.shop ?? ''
       const billTotal = bill ? (bill.printed_total ?? bill.computed_total) : null
       if (info.kind === 'upi') {
         const who = info.name || sayVpa(info.vpa)
+        // warnings first (safety), then who it pays, then the reminder
+        const warns: string[] = []
         const parts = [t('qrPays', { name: who, vpa: sayVpa(info.vpa) })]
-        let warn = false
-        if (shop && !sameShop(shop, info.name, info.vpa)) { parts.unshift(t('qrMismatch', { shop, name: who })); warn = true }
+        if (shop && !sameShop(shop, info.name, info.vpa)) warns.push(t('qrMismatch', { shop, name: who }))
         else if (shop) parts.push(t('qrMatches'))
         if (info.amount != null) {
-          if (billTotal != null && Math.abs(info.amount - billTotal) > 1) { parts.push(t('qrAmountDiff', { a: money(info.amount), b: money(billTotal) })); warn = true }
+          if (billTotal != null && Math.abs(info.amount - billTotal) > 1) warns.push(t('qrAmountDiff', { a: money(info.amount), b: money(billTotal) }))
           else parts.push(t('qrAmount', { a: money(info.amount) }))
         }
         parts.push(t('qrNeverReceive'))
+        const warn = warns.length > 0
+        parts.unshift(...warns)
         const speech = parts.join(' ')
         setResult(src(() => ({ tone: warn ? 'warning' : 'success', accent: warn ? 'coral' : 'green', label: t('qrLabel'),
           headline: info.name || info.vpa, detail: speech,
