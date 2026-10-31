@@ -3,7 +3,7 @@
 // sentence it was on (alerts must never make the user lose an answer). stop() clears; repeat() replays.
 // en -> phone voice (fast, offline). hi/pa -> backend /tts (Sarvam), phone voice as fallback.
 import { api } from './api';
-import { getLang, type Lang } from './settings';
+import { getLang, getSpeed, SPEED_RATE, type Lang } from './settings';
 
 export type Priority = 'info' | 'answer' | 'alert';
 const RANK: Record<Priority, number> = { info: 0, answer: 1, alert: 2 };
@@ -145,6 +145,7 @@ async function speakLine(line: Line, my: number) {
 function playAudio(url: string, line: Line, offset?: number) {
   return new Promise<void>((resolve, reject) => {
     audio.src = url;
+    audio.playbackRate = SPEED_RATE[getSpeed()]; // pitch is kept, only the pace changes
     if (offset) audio.addEventListener('loadedmetadata', () => { audio.currentTime = offset; }, { once: true });
     audio.onended = () => resolve();
     audio.onerror = () => reject(new Error('audio'));
@@ -191,7 +192,7 @@ async function webSpeech(line: Line, my: number) {
       const u = new SpeechSynthesisUtterance(part);
       u.lang = VOICE_LANG[line.lang];
       if (voice) u.voice = voice;
-      u.rate = 1.05;
+      u.rate = 1.05 * SPEED_RATE[getSpeed()];
       const done = () => { clearTimeout(guard); resolve(); };
       const guard = setTimeout(done, 2500 + part.length * 110); // onend sometimes never fires
       u.onend = done;

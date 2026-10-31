@@ -11,6 +11,8 @@ export type ResultView = {
   chips?: string[]                    // small facts
   items?: { name: string; amount: string }[]
   swatch?: 'blue' | 'green' | 'red'
+  compare?: { label: string; value: string }[]   // two small cards under the result (items add up to / bill says)
+  accent?: 'purple' | 'blue' | 'coral' | 'pink' | 'green'  // card colour; by default it follows the tone
 }
 
 /** A result card that is (re)built when shown, so it follows the current language. */
@@ -39,6 +41,9 @@ export function fromRead(r: ReadResult): ResultView {
         : [b.shop, t('itemsN', { n: b.items.length })].filter(Boolean).join(' · '),
       items: b.items.map((i) => ({ name: [i.name, i.qty && i.qty !== 1 ? `× ${i.qty}` : ''].filter(Boolean).join(' '), amount: money(i.amount, cur) })),
       chips: r.uncertain.includes('multiple_bills') ? [t('multipleBills')] : undefined,
+      compare: b.mismatch && !retake && b.computed_total != null && b.printed_total != null
+        ? [{ label: t('addUp'), value: money(b.computed_total, cur) }, { label: t('billSays'), value: money(b.printed_total, cur) }]
+        : undefined,
     }
   }
   return {
@@ -55,7 +60,7 @@ export function fromMoney(m: MoneyResult): ResultView {
   const chips = m.items.map((i) => `${money(i.value, cur)} × ${i.count}`)
   if (m.suspicious.length) {
     const why = `r_${m.suspicious[0].reason}` as PhraseKey
-    return { tone: 'warning', label, headline: t('mayBeFake', { n: money(m.suspicious[0].value, cur) }),
+    return { tone: 'warning', accent: 'pink', label, headline: t('mayBeFake', { n: money(m.suspicious[0].value, cur) }),
       detail: `${t(why)}. ${t('doNotAccept')}`, chips }
   }
   if (m.unclear) return { tone: 'warning', label, headline: t('spreadRetake'), chips }

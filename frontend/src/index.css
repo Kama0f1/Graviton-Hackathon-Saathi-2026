@@ -1,34 +1,43 @@
-/* Atkinson Hyperlegible was designed by the Braille Institute for low-vision readers. */
-@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Noto+Sans+Devanagari:wght@500;700&family=Noto+Sans+Gurmukhi:wght@500;700&display=swap');
+/* Inter for the Pulse look; Noto for Hindi and Punjabi. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@500;600;700&family=Noto+Sans+Gurmukhi:wght@500;600;700&display=swap');
 
-/* High-contrast palette: black, white and one signal yellow. Every text pair is >= 7:1 (WCAG AAA). */
+/* Light grey canvas, white cards, ink buttons, soft gradient result cards.
+   Ink on canvas 17:1; grey text 6.3:1; white text sits only on the darker end of each gradient (>= 4.5:1). */
 :root {
-  --bg: #000;
-  --surface: #121212;
-  --surface-2: #1e1e1e;
-  --line: #3a3a3a;
-  --text: #fff;
-  --muted: #c8c8c8;
-  --yellow: #ffd400;     /* black on yellow: 14.6:1 */
-  --ink: #000;
-  --red: #c4000f;        /* white on red: 6.9:1; used as a fill, always with words */
-  --red-text: #ff6b6b;   /* on black: 7.6:1 */
-  --green: #00c853;      /* black on green: 9.9:1 */
-  --radius: 10px;
+  --bg: #eeeef1;
+  --card: #fff;
+  --ink: #111114;
+  --sub: #55555f;
+  --faint: #8a8a94;
+  --line: #e1e1e7;
+  --red: #c4291c;
+  --green: #1f7a3a;
+  --r-card: 28px;
+  --r-pill: 999px;
+  --shadow: 0 10px 30px rgba(17, 17, 20, 0.10);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  font-family: 'Atkinson Hyperlegible', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi', system-ui, sans-serif;
-  color: var(--text);
+  /* gradient cards: a diagonal base and two soft glows (from the reference) */
+  --g-purple: radial-gradient(circle at 88% 12%, rgba(196, 168, 255, 0.55), transparent 55%), radial-gradient(circle at 8% 100%, rgba(40, 22, 120, 0.55), transparent 55%), linear-gradient(135deg, #4a2fb4, #6d52d4);
+  --g-blue: radial-gradient(circle at 88% 12%, rgba(160, 196, 255, 0.5), transparent 55%), radial-gradient(circle at 8% 100%, rgba(14, 50, 140, 0.55), transparent 55%), linear-gradient(135deg, #1b4fb8, #3a6fd4);
+  --g-coral: radial-gradient(circle at 88% 12%, rgba(255, 170, 140, 0.5), transparent 55%), radial-gradient(circle at 8% 100%, rgba(130, 20, 14, 0.55), transparent 55%), linear-gradient(135deg, #a8231b, #c9452f);
+  --g-pink: radial-gradient(circle at 88% 12%, rgba(255, 170, 210, 0.5), transparent 55%), radial-gradient(circle at 8% 100%, rgba(110, 10, 60, 0.55), transparent 55%), linear-gradient(135deg, #a31a5c, #c93479);
+  --g-green: radial-gradient(circle at 88% 12%, rgba(200, 230, 120, 0.45), transparent 55%), radial-gradient(circle at 8% 100%, rgba(10, 70, 30, 0.55), transparent 55%), linear-gradient(135deg, #1a6a32, #2c8540);
+  --g-orb: linear-gradient(135deg, #7b5cf0, #e9549b 55%, #f79a6b);
+  font-family: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi', system-ui, sans-serif;
+  color: var(--ink);
   background: var(--bg);
-  color-scheme: dark;
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
+:lang(hi) { font-family: 'Inter', 'Noto Sans Devanagari', system-ui, sans-serif; }
+:lang(pa) { font-family: 'Inter', 'Noto Sans Gurmukhi', system-ui, sans-serif; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg); }
 body { min-height: 100dvh; overscroll-behavior: none; }
 button, input, select { font: inherit; color: inherit; }
 button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
-:focus-visible { outline: 4px solid var(--yellow); outline-offset: 3px; }
-::selection { background: var(--yellow); color: var(--ink); }
+:focus-visible { outline: 3px solid #4a2fb4; outline-offset: 3px; }
+::selection { background: #c4b5fd; color: var(--ink); }

@@ -1,14 +1,18 @@
-// Navigate mode: obstacle alerts on the phone (always on), walking directions (GPS),
-// and backend actions: what's ahead (/describe), read sign (/sign), which bin (/waste) + the colour bin finder.
+// Navigate tab: obstacle alerts on the phone (always on), stairs/walls watch, and four tools picked in a pill control:
+// Ahead (/describe), Sign (/sign), Bin (/waste + colour bin finder) and Route (walking directions by GPS).
 import { useEffect, useRef, useState } from 'react'
 import CameraView from '../components/CameraView'
 import ResultCard from '../components/ResultCard'
+import Segmented from '../components/Segmented'
+import Dots, { closeness } from '../components/Dots'
+import Icon, { type IconName } from '../components/Icon'
 import { useCamera } from '../core/camera'
 import { api, ApiError } from '../core/api'
 import { say } from '../core/speech'
 import { haptics } from '../core/haptics'
 import { fromSign, fromSpeech, fromWaste, type ResultSrc, src } from '../core/result'
 import type { Command } from '../core/listen'
+import { useSettings } from '../core/useSettings'
 import { useObstacles } from '../vision/detector'
 import { useHazardWatch } from '../vision/hazardWatch'
 import { startBinFinder, type BinColor } from '../vision/binFinder'
@@ -16,29 +20,52 @@ import { getPosition, inMetres, rp, sayDist, startCompass, startDirections, wher
 import { frame } from './useFrame'
 import { t } from '../i18n/phrases'
 
+type Tool = 'ahead' | 'sign' | 'bin' | 'route'
+const TOOL_OF: Partial<Record<Command['cmd'], Tool>> = {
+  ahead: 'ahead', sign: 'sign', bin: 'bin', findBin: 'bin', route: 'route', directions: 'route', whereAmI: 'route',
+}
+const TURN_ICON: Record<string, IconName> = {
+  '←': 'turnLeft', '↖': 'turnLeft', '↙': 'turnLeft', '→': 'turnRight', '↗': 'turnRight', '↘': 'turnRight',
+  '↓': 'uturn', '◉': 'flag',
+}
+
 export default function NavigateMode({ command }: { command: (Command & { id: number }) | null }) {
   const cam = useCamera()
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [obstacles, setObstacles] = useState(true)
+  const set = useSettings()
+  const [tool, setTool] = useState<Tool>('ahead')
   const [result, setResult] = useState<ResultSrc | null>(null)
   const [bin, setBin] = useState<BinColor | null>(null)
   const [finding, setFinding] = useState(false)
   const [route, setRoute] = useState<RouteView>({ status: 'idle' })
-  const [asking, setAsking] = useState(false)   // the "where to?" box is open
   const [dest, setDest] = useState('')
+  const total = useRef(0)               // route length at the start, for the progress dots
   const stopFinder = useRef<(() => void) | null>(null)
   const stopRoute = useRef<(() => void) | null>(null)
   const routing = route.status === 'active' || route.status === 'locating' || route.status === 'searching'
-  const { status, count, seen } = useObstacles(cam.videoRef, canvasRef, cam.on && obstacles && !finding, cam.mirrored, routing)
+  const watching = cam.on && set.obstacles && !finding
+  const { status, count, seen } = useObstacles(cam.videoRef, canvasRef, watching, cam.mirrored, routing)
   // stairs, walls, kerbs, glass... (things the phone-side detector cannot see), checked by the AI every few seconds
-  const hazard = useHazardWatch(cam.videoRef, cam.grab, cam.on && obstacles && !finding)
+  const hazard = useHazardWatch(cam.videoRef, cam.grab, cam.on && set.hazards && !finding)
 
   useEffect(() => {
     void cam.start()
     return () => { stopFinder.current?.(); stopRoute.current?.(); cam.stop() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (route.status === 'active' && route.remaining != null && route.remaining > total.current) total.current = route.remaining
+    if (route.status === 'idle') total.current = 0
+  }, [route])
+
   const run = async (fn: () => Promise<void>) => { try { await fn() } catch (e) { if (!(e instanceof ApiError)) console.error(e) } }
+
+  const pick = (x: Tool) => {
+    haptics.tap()
+    setTool(x)
+    const name = { ahead: t('toolAhead'), sign: t('toolSign'), bin: t('toolBin'), route: t('toolRoute') }[x]
+    say(x === 'route' && !routing ? `${name}. ${rp('whereTo')}` : t('toolSet', { t: name }), 'info')
+  }
 
   const ahead = () => run(async () => {
     const img = await frame(cam, 768, 0.8); if (!img) return
@@ -61,25 +88,19 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
     stopFinder.current = startBinFinder(cam.videoRef.current, bin)
     setFinding(true)
   }
-  const toggleObstacles = (on = !obstacles) => { setObstacles(on); say(on ? t('obstaclesOn') : t('obstaclesOff'), 'info') }
 
   const go = (place: string) => {
     place = place.trim()
-    if (!place) return
+    if (!place) { say(rp('whereTo'), 'answer'); return }
+    void startCompass() // needs a tap on iPhone
     stopRoute.current?.()
-    setAsking(false)
     setDest('')
     setResult(null)
+    setTool('route')
     window.scrollTo({ top: 0 })
     stopRoute.current = startDirections(place, setRoute)
   }
   const endRoute = () => { stopRoute.current?.(); stopRoute.current = null; setRoute({ status: 'idle' }) }
-  const openDirections = () => {
-    void startCompass() // needs a tap on iPhone
-    if (routing) { repeatStep(); return }  // while walking, the button repeats what to do now (End is on the panel)
-    setAsking((a) => !a)
-    if (!asking) say(rp('whereTo'), 'answer')
-  }
   const repeatStep = () => {
     if (route.status === 'active' && route.instruction) {
       say(route.toNext != null && route.toNext > 15 ? inMetres(route.toNext, route.instruction) : route.instruction, 'answer')
@@ -89,78 +110,109 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
     let pos: GeolocationPosition
     try { pos = await getPosition() } catch { say(rp('noGps'), 'answer'); return }
     const text = await whereAmI([pos.coords.latitude, pos.coords.longitude])
-    setResult(src(() => ({ tone: 'info', label: t('lblPlace'), headline: text })))
+    setResult(src(() => ({ tone: 'info', accent: 'blue', label: t('lblPlace'), headline: text })))
     say(text, 'answer')
   })
 
   useEffect(() => {
     if (!command) return
+    const to = TOOL_OF[command.cmd]
+    if (to) setTool(to)
     switch (command.cmd) {
       case 'ahead': void ahead(); break
       case 'sign': void sign(); break
       case 'bin': void whatBin(); break
       case 'findBin': findBin(); break
-      case 'obstaclesOn': toggleObstacles(true); break
-      case 'obstaclesOff': toggleObstacles(false); break
       case 'route': go(command.place); break
-      case 'directions': if (routing) repeatStep(); else { setAsking(true); say(rp('whereTo'), 'answer') } break
+      case 'directions': if (routing) repeatStep(); else say(rp('whereTo'), 'answer'); break
       case 'whereAmI': void locate(); break
       case 'more': repeatStep(); break
       case 'stop': if (finding) findBin(); if (routing) endRoute(); break
     }
   }, [command?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const badge = finding ? t('findBin')
-    : obstacles && hazard ? hazard.speech
-    : obstacles ? (status || (seen ? `${seen.name} · ${t(seen.pos)}${seen.metres != null ? ` · ${seen.metres} m` : ''}${seen.close ? ' · !' : ''}${count > 1 ? `  +${count - 1}` : ''}` : t('nothingSeen')))
-    : undefined
+  // camera chip: what the phone sees right now
+  const chip = finding ? t('findBin')
+    : set.obstacles ? (status || (seen ? `${seen.name} · ${t(seen.pos)}${seen.metres != null ? ` · ${seen.metres} m` : ''}${count > 1 ? `  +${count - 1}` : ''}` : t('nothingSeen')))
+    : `${t('obstacles')}: ${t('off')}`
+  const chipTone = !set.obstacles ? 'idle' : seen?.close ? 'alert' : 'ok'
+  const showRoute = route.status !== 'idle'
+  const progress = route.status === 'arrived' ? 1 : total.current && route.remaining != null ? 1 - route.remaining / total.current : 0
+  const hazardTitle = hazard ? (hazard.speech.includes(',') ? hazard.speech.slice(0, hazard.speech.lastIndexOf(',')) : hazard.speech) : ''
 
   return (
     <div className="mode">
-      {route.status !== 'idle' && (
-        <section className={`route route-${route.status}`} aria-live="polite">
+      <Segmented label={t('navTitle')} value={tool} onChange={pick} items={[
+        { id: 'ahead', label: t('toolAhead') }, { id: 'sign', label: t('toolSign') },
+        { id: 'bin', label: t('toolBin') }, { id: 'route', label: t('toolRoute') },
+      ]} />
+
+      {showRoute && (
+        <section className={`hero g-${route.status === 'error' ? 'coral' : route.status === 'arrived' ? 'green' : 'blue'} route route-${route.status}`} aria-live="polite">
+          <div className="hero-top">
+            <span className="hero-label">{route.status === 'arrived' ? t('arrived') : t('nextTurn')}</span>
+            {route.status === 'active' && route.remaining != null && <span className="hero-tag">{t('toGo', { d: sayDist(route.remaining) })}</span>}
+            <button type="button" className="hero-end" onClick={endRoute}>{t('endRoute')}</button>
+          </div>
           <button type="button" className="route-main" onClick={repeatStep}>
-            <span className="route-arrow" aria-hidden="true">{route.status === 'active' || route.status === 'arrived' ? route.arrow : '…'}</span>
+            <span className="route-icon"><Icon name={route.status === 'active' || route.status === 'arrived' ? TURN_ICON[route.arrow ?? ''] ?? 'straight' : 'pin'} size={34} /></span>
             <span className="route-text">
               <b>{route.status === 'locating' ? t('locating') : route.status === 'searching' ? t('searchingPlace')
                 : route.status === 'error' ? route.error : route.instruction}</b>
-              <small>
-                {route.place}
-                {route.status === 'active' && route.toNext != null && ` · ${t('nextIn', { d: sayDist(route.toNext) })}`}
-                {route.status === 'active' && route.remaining != null && ` · ${t('toGo', { d: sayDist(route.remaining) })}`}
-                {route.status === 'arrived' && ` · ${t('arrived')}`}
-              </small>
+              {route.status === 'active' && route.toNext != null && <small>{t('nextIn', { d: sayDist(route.toNext) })}</small>}
             </span>
           </button>
-          <button type="button" className="route-end" onClick={endRoute}>{t('endRoute')}</button>
+          {route.place && <span className="hero-label faint">{t('routeTo', { p: route.place })}</span>}
+          {(route.status === 'active' || route.status === 'arrived') &&
+            <Dots rows={2} className="progress" values={Array.from({ length: 30 }, (_, i) => (i < Math.round(progress * 30) ? 2 : 0))} />}
         </section>
       )}
 
-      <CameraView cam={cam} canvasRef={canvasRef} badge={badge} badgeAlert={((!!seen?.close) || !!hazard?.urgent) && obstacles && !finding} />
+      <CameraView cam={cam} canvasRef={canvasRef} chip={chip} chipTone={chipTone} compact={showRoute || !!result || (!!hazard && set.hazards)} />
 
-      {asking && !routing && (
-        <form className="ask" onSubmit={(e) => { e.preventDefault(); go(dest) }}>
-          <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder={t('whereTo')} aria-label={t('whereTo')} autoFocus enterKeyHint="go" />
-          <button type="submit">{t('go')}</button>
-        </form>
+      {hazard && set.hazards && !finding && (
+        <section className={`hero g-coral hazard ${hazard.urgent ? 'urgent' : ''}`} aria-hidden="true">
+          <div className="hero-top"><span className="hero-label"><Icon name="warn" size={18} />{t('hazardAhead')}</span></div>
+          <p className="hero-headline">{hazardTitle}</p>
+          <div className="hazard-row">
+            <span className="big-num">{hazard.metres} m</span>
+            <Dots rows={7} values={closeness(1 - hazard.metres / 7)} />
+          </div>
+        </section>
       )}
 
-      <ResultCard src={result} />
+      {tool === 'ahead' && (
+        <button type="button" className="pill-btn" onClick={() => void ahead()}><Icon name="eye" />{t('descAhead')}</button>
+      )}
+      {tool === 'sign' && (
+        <button type="button" className="pill-btn" onClick={() => void sign()}><Icon name="sign" />{t('readSignBtn')}</button>
+      )}
+      {tool === 'bin' && (
+        <>
+          <button type="button" className="pill-btn" onClick={() => void whatBin()}><Icon name="bin" />{t('whichBinBtn')}</button>
+          <button type="button" className={`pill-btn light ${finding ? 'on' : ''}`} aria-pressed={finding} onClick={findBin} disabled={!bin && !finding}>
+            {finding ? t('stopFinding') : bin ? t('findBinBtn', { c: t(bin) }) : t('findBin')}
+          </button>
+          {!result && <p className="hint">{t('binHint')}</p>}
+        </>
+      )}
+      {tool === 'route' && (routing ? (
+        <div className="row">
+          <button type="button" className="pill-btn grow" onClick={repeatStep}><Icon name="repeat" />{t('repeatTurn')}</button>
+          <button type="button" className="round big" onClick={() => void locate()} aria-label={t('whereAmI')}><Icon name="pin" /></button>
+        </div>
+      ) : (
+        <>
+          <form className="ask" onSubmit={(e) => { e.preventDefault(); go(dest) }}>
+            <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder={t('whereTo')} aria-label={t('whereTo')} enterKeyHint="go" />
+            <button type="submit" aria-label={t('go')}><Icon name="send" /></button>
+          </form>
+          <button type="button" className="pill-btn light" onClick={() => void locate()}><Icon name="pin" />{t('whereAmI')}</button>
+          {!result && <p className="hint">{t('routeHint')}</p>}
+        </>
+      ))}
 
-      <div className="actions">
-        <button type="button" className="btn primary full" onClick={() => void ahead()}>{t('ahead')}</button>
-        <button type="button" className="btn" onClick={() => void sign()}>{t('sign')}</button>
-        <button type="button" className="btn" onClick={() => void whatBin()}>{t('bin')}</button>
-        <button type="button" className={`btn ${routing || asking ? 'on' : ''}`} aria-pressed={routing || asking} onClick={openDirections}>
-          {t('directions')}</button>
-        <button type="button" className="btn" onClick={() => void locate()}>{t('whereAmI')}</button>
-      </div>
-      <div className="toggles">
-        <button type="button" className={`toggle ${obstacles ? 'on' : ''}`} aria-pressed={obstacles} onClick={() => toggleObstacles()}>
-          {t('obstacles')}: <b>{obstacles ? t('on') : t('off')}</b></button>
-        <button type="button" className={`toggle ${finding ? 'on' : ''}`} aria-pressed={finding} onClick={findBin} disabled={!bin && !finding}>
-          {t('findBin')}{bin && !finding ? ` (${t(bin)})` : ''}</button>
-      </div>
+      <ResultCard src={result} />
     </div>
   )
 }

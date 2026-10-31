@@ -1,8 +1,10 @@
-// Read mode: documents and bills (/read), follow-up questions (/read/ask),
-// and money: count, check change, check note (/money). Photo, guided capture, or upload (incl. PDF).
+// Read tab: four tools in a pill control. Document: guided scan, quick photo or upload (incl. PDF) to /read.
+// Money: count and check change (/money). Note: fake-note check. Ask: questions about the last page (/read/ask).
 import { useEffect, useRef, useState } from 'react'
 import CameraView from '../components/CameraView'
 import ResultCard from '../components/ResultCard'
+import Segmented from '../components/Segmented'
+import Icon from '../components/Icon'
 import { useCamera } from '../core/camera'
 import { api, ApiError, type MoneyMode, type ReadResult } from '../core/api'
 import { say } from '../core/speech'
@@ -31,11 +33,17 @@ async function fitUpload(file: Blob): Promise<Blob | null> {
   return file.size <= MAX_UPLOAD ? file : null
 }
 
+type Tool = 'doc' | 'money' | 'note' | 'ask'
+const TOOL_OF: Partial<Record<Command['cmd'], Tool>> = {
+  snap: 'doc', guide: 'doc', more: 'doc', count: 'money', change: 'money', paid: 'money', note: 'note', ask: 'ask',
+}
+
 export default function ReadMode({ command, shared }: {
   command: (Command & { id: number }) | null
   shared: Blob | null
 }) {
   const cam = useCamera()
+  const [tool, setTool] = useState<Tool>('doc')
   const [result, setResult] = useState<ResultSrc | null>(null)
   const [guiding, setGuiding] = useState(false)
   const [question, setQuestion] = useState('')
@@ -121,8 +129,17 @@ export default function ReadMode({ command, shared }: {
     if (mode === 'count') paid.current = r.paid ?? undefined
   })
 
+  const pick = (x: Tool) => {
+    haptics.tap()
+    setTool(x)
+    const name = { doc: t('toolDoc'), money: t('toolMoney'), note: t('toolNote'), ask: t('toolAsk') }[x]
+    say(t('toolSet', { t: name }), 'info')
+  }
+
   useEffect(() => {
     if (!command) return
+    const to = TOOL_OF[command.cmd]
+    if (to) setTool(to)
     switch (command.cmd) {
       case 'snap': if (!guiding) guide(); break   // "read this" by voice = guided scan (the user can't see the frame)
       case 'guide': if (!guiding) guide(); break
@@ -136,9 +153,14 @@ export default function ReadMode({ command, shared }: {
     }
   }, [command?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const busy = reading || guiding
   return (
     <div className="mode">
-      <CameraView cam={cam} badge={guiding ? t('scan') : undefined} overlay={
+      <Segmented label={t('readTitle')} value={tool} onChange={pick} items={[
+        { id: 'doc', label: t('toolDoc') }, { id: 'money', label: t('toolMoney') },
+        { id: 'note', label: t('toolNote') }, { id: 'ask', label: t('toolAsk') },
+      ]} />
+      <CameraView cam={cam} chip={guiding ? t('scan') : undefined} overlay={
         reading ? (
           <div className="scan-overlay reading" aria-hidden="true">
             {preview && <img src={preview} alt="" />}
@@ -150,25 +172,42 @@ export default function ReadMode({ command, shared }: {
             <div className="scan-msg"><b>{hint.arrow}</b> {hint.text}</div>
           </div>
         ) : null
-      } />
+      } compact={!!result} />
+
+      {tool === 'doc' && (
+        <>
+          <button type="button" className={`pill-btn ${guiding ? 'on' : ''}`} aria-pressed={guiding} onClick={guide} disabled={reading}>
+            <Icon name={guiding ? 'stop' : 'scan'} />{guiding ? t('stop') : t('scanDoc')}</button>
+          <div className="row three">
+            <button type="button" className="pill-btn light small" onClick={() => void snap()} disabled={busy}><Icon name="photo" size={20} />{t('quickPhoto')}</button>
+            <button type="button" className="pill-btn light small" onClick={() => fileInput.current?.click()} disabled={busy}><Icon name="upload" size={20} />{t('upload')}</button>
+            <button type="button" className="pill-btn light small" onClick={more}><Icon name="more" size={20} />{t('more2')}</button>
+          </div>
+        </>
+      )}
+      {tool === 'money' && (
+        <>
+          <button type="button" className="pill-btn" onClick={() => void moneyCheck('count')} disabled={busy}><Icon name="money" />{t('countBtn')}</button>
+          <button type="button" className="pill-btn light" onClick={() => void moneyCheck('change')} disabled={busy}>{t('changeBtn')}</button>
+          {!result && <p className="hint">{t('moneyHint')}</p>}
+        </>
+      )}
+      {tool === 'note' && (
+        <>
+          <button type="button" className="pill-btn" onClick={() => void moneyCheck('check')} disabled={busy}><Icon name="eye" />{t('noteBtn')}</button>
+          {!result && <p className="hint">{t('noteHint')}</p>}
+        </>
+      )}
+      {tool === 'ask' && (
+        <>
+          <form className="ask" onSubmit={(e) => { e.preventDefault(); void ask(question) }}>
+            <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('askPlaceholder')} aria-label={t('askPlaceholder')} enterKeyHint="send" />
+            <button type="submit" aria-label={t('ask')}><Icon name="send" /></button>
+          </form>
+          {!result && <p className="hint">{t('askHint')}</p>}
+        </>
+      )}
       <ResultCard src={result} />
-      <div className="actions">
-        <button type="button" className={`btn primary full ${guiding ? 'on' : ''}`} aria-pressed={guiding} onClick={guide} disabled={reading}>
-          {guiding ? t('stop') : t('scanDoc')}</button>
-        <button type="button" className="btn" onClick={() => void snap()} disabled={reading || guiding}>{t('quickPhoto')}</button>
-        <button type="button" className="btn" onClick={() => fileInput.current?.click()}>{t('upload')}</button>
-      </div>
-      <h3 className="group">{t('money')}</h3>
-      <div className="actions three">
-        <button type="button" className="btn" onClick={() => void moneyCheck('count')}>{t('count')}</button>
-        <button type="button" className="btn" onClick={() => void moneyCheck('change')}>{t('change')}</button>
-        <button type="button" className="btn" onClick={() => void moneyCheck('check')}>{t('note')}</button>
-      </div>
-      <form className="ask" onSubmit={(e) => { e.preventDefault(); void ask(question) }}>
-        <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('askPlaceholder')} aria-label={t('askPlaceholder')} enterKeyHint="send" />
-        <button type="submit">{t('ask')}</button>
-      </form>
-      <button type="button" className="toggle wide" onClick={more}>{t('more2')}</button>
       <input ref={fileInput} type="file" accept="image/*,application/pdf" hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = '' }} />
     </div>
