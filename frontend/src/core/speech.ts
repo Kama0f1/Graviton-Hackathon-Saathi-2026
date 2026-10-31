@@ -169,7 +169,8 @@ function pickVoice(lang: Lang) {
 // One utterance per sentence: Chrome stops long utterances (~15 s), and an interrupted
 // answer can resume from the exact sentence it was on.
 function chunks(text: string): string[] {
-  const parts = (text.match(/[^.!?।\n]+[.!?।]?/g) ?? [text]).map((p) => p.trim()).filter(Boolean);
+  // split after . ! ? । only when a space or line break follows, so "1.5 metres" and "₹1,099.50" stay whole
+  const parts = text.split(/(?<=[.!?।])\s+|\n+/).map((p) => p.trim()).filter(Boolean);
   return parts.length ? parts : [text];
 }
 

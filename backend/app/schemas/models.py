@@ -84,3 +84,11 @@ class MoneyResult(BaseModel):
 class ErrorResult(BaseModel):
     error: str
     speech: str = "Sorry, I couldn't do that. Please try again."
+
+
+class HazardResult(BaseModel):
+    hazard: str                 # "none", "stairs_down", "wall", ...
+    position: Literal["left", "ahead", "right"] = "ahead"
+    metres: float = 0     # rounded: 0.5 m steps up to 2 m, then whole metres
+    urgent: bool = False        # close or a drop: the phone interrupts and vibrates
+    speech: str = ""            # empty when there is nothing worth saying

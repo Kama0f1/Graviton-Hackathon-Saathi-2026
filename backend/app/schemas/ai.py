@@ -2,7 +2,7 @@
 No defaults and no dicts here, because Gemini's schema support is stricter than Pydantic's."""
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AIField(BaseModel):
@@ -58,3 +58,15 @@ class AIWaste(BaseModel):
 class AIGuidance(BaseModel):
     ready: bool
     move: Literal["left", "right", "up", "down", "closer", "back", "hold", "light", "none"]
+
+
+HAZARDS = Literal[
+    "none", "stairs_up", "stairs_down", "step_down", "kerb", "wall", "glass", "door", "pole", "pothole",
+    "open_drain", "vehicle", "two_wheeler", "animal", "person", "wet_floor", "barrier", "low_obstacle", "other",
+]
+
+
+class AIHazard(BaseModel):
+    hazard: HAZARDS
+    position: Literal["left", "ahead", "right"]
+    metres: float   # how far away; clamped and rounded in Python

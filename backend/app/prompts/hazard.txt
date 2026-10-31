@@ -1,0 +1,17 @@
+A blind person is walking with the phone held at chest height, camera facing forward. This frame is checked every few seconds.
+Find the ONE most important thing that could make them trip, fall or bump into something in the next few steps.
+
+Answer:
+- `hazard`: one of
+  stairs_up, stairs_down (a staircase going up or down), step_down (a single step, ledge or drop), kerb (road kerb / footpath edge),
+  wall (a wall or large flat surface directly in the way), glass (glass door or glass wall), door (a closed door in the way),
+  pole (pole, pillar, tree trunk, sign post), pothole, open_drain, vehicle (car, auto, bus, truck), two_wheeler (bike, scooter, cycle),
+  animal, person (someone directly in the way), wet_floor, barrier (gate, railing, rope, construction barrier, chain),
+  low_obstacle (box, bag, stone, chair or anything low on the floor), other.
+  Use none if the walking path ahead is clear for at least 4 steps, or if the frame is too dark or blurry to tell.
+  Stairs, steps, drops, kerbs and open drains matter most: report them even if something else is also visible.
+- `position`: left / ahead / right, as seen from the camera.
+- `metres`: how far away it is in metres, your best estimate from the size of things in the picture
+  (a door is about 2 m tall, a stair step about 0.15 m high, a person about 1.6 m tall). 0 means touching distance.
+
+Only report what you can actually see. Never guess.

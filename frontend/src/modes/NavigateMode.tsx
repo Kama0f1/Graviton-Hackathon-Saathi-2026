@@ -10,6 +10,7 @@ import { haptics } from '../core/haptics'
 import { fromSign, fromSpeech, fromWaste, type ResultSrc, src } from '../core/result'
 import type { Command } from '../core/listen'
 import { useObstacles } from '../vision/detector'
+import { useHazardWatch } from '../vision/hazardWatch'
 import { startBinFinder, type BinColor } from '../vision/binFinder'
 import { getPosition, inMetres, rp, sayDist, startCompass, startDirections, whereAmI, type RouteView } from '../core/route'
 import { frame } from './useFrame'
@@ -29,6 +30,8 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
   const stopRoute = useRef<(() => void) | null>(null)
   const routing = route.status === 'active' || route.status === 'locating' || route.status === 'searching'
   const { status, count, seen } = useObstacles(cam.videoRef, canvasRef, cam.on && obstacles && !finding, cam.mirrored, routing)
+  // stairs, walls, kerbs, glass... (things the phone-side detector cannot see), checked by the AI every few seconds
+  const hazard = useHazardWatch(cam.videoRef, cam.grab, cam.on && obstacles && !finding)
 
   useEffect(() => {
     void cam.start()
@@ -108,7 +111,8 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
   }, [command?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const badge = finding ? t('findBin')
-    : obstacles ? (status || (seen ? `${seen.name} · ${t(seen.pos)}${seen.close ? ' · !' : ''}${count > 1 ? `  +${count - 1}` : ''}` : t('nothingSeen')))
+    : obstacles && hazard ? hazard.speech
+    : obstacles ? (status || (seen ? `${seen.name} · ${t(seen.pos)}${seen.metres != null ? ` · ${seen.metres} m` : ''}${seen.close ? ' · !' : ''}${count > 1 ? `  +${count - 1}` : ''}` : t('nothingSeen')))
     : undefined
 
   return (
@@ -132,7 +136,7 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
         </section>
       )}
 
-      <CameraView cam={cam} canvasRef={canvasRef} badge={badge} badgeAlert={!!seen?.close && obstacles && !finding} />
+      <CameraView cam={cam} canvasRef={canvasRef} badge={badge} badgeAlert={((!!seen?.close) || !!hazard?.urgent) && obstacles && !finding} />
 
       {asking && !routing && (
         <form className="ask" onSubmit={(e) => { e.preventDefault(); go(dest) }}>
