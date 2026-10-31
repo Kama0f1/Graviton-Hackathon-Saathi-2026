@@ -17,7 +17,7 @@ Submitted under **PS #13 (NaviAble)**, extended with #18 (documents), #22 (waste
 | --- | --- | --- |
 | Frontend | `frontend/` | Vite, React, TypeScript, vite-plugin-pwa, TF.js COCO-SSD, Web Speech, Vibration, Web Audio |
 | Backend | `backend/` | Python, FastAPI, Gemini Flash (google-genai), PyMuPDF, Sarvam, Pydantic |
-| Pitch & PPT | `demo/` | Google Slides / Canva, CapCut / Clipchamp, scrcpy |
+| Pitch & PPT | `docs/`, `demo/` | Google Slides / Canva, CapCut / Clipchamp, scrcpy |
 
 Rule: nobody edits another role's folder. The API contract (`backend/app/schemas/`) changes only if frontend and backend both agree.
 
