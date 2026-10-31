@@ -1,29 +1,28 @@
 {
-  "name": "saathi-frontend",
+  "name": "frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host"
+    "lint": "oxlint",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource/noto-sans": "^5.3.0",
-    "@fontsource/noto-sans-devanagari": "^5.3.0",
-    "@fontsource/noto-sans-gurmukhi": "^5.3.0",
     "@tensorflow-models/coco-ssd": "^2.2.3",
-    "@tensorflow/tfjs": "^4.20.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "workbox-precaching": "^7.1.0"
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.0",
-    "vite-plugin-pwa": "^0.20.1"
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.89.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.5"
   }
 }
