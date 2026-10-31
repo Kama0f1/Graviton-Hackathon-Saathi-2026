@@ -49,7 +49,14 @@ async def ask(
     """Send (bytes, mime_type) files + prompt; the AI must answer in `schema`'s JSON shape.
     Gemini first; if it fails or times out and GROQ_API_KEY is set, Groq answers instead (images only)."""
     try:
-        return await _ask_gemini(prompt, schema, files, model, timeout)
+        try:
+            return await _ask_gemini(prompt, schema, files, model, timeout)
+        except AIError as first:
+            # the stronger model failed or was slow: the fast default model gets one go before Groq
+            if not model or model == GEMINI_MODEL or not fallback or "GEMINI_API_KEY" in str(first):
+                raise
+            log.warning("%s failed (%s); trying %s", model, first, GEMINI_MODEL)
+            return await _ask_gemini(prompt, schema, files, GEMINI_MODEL, min(timeout, 20.0))
     except AIError as exc:
         from . import groq  # local import keeps tests simple
 
@@ -63,21 +70,42 @@ async def ask(
             raise exc from exc2
 
 
+# Thinking makes answers slow (that is why Flash once took 100 s). Turn it off; models differ in what they accept,
+# so try budget=0, then level=minimal, then default, and remember what worked for each model.
+_THINKING = [
+    lambda: types.ThinkingConfig(thinking_budget=0),
+    lambda: types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
+    lambda: None,
+]
+_thinking_choice: dict = {}
+
+
+async def _generate(model, contents, schema, timeout):
+    start = _thinking_choice.get(model, 0)
+    for i in range(start, len(_THINKING)):
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json", response_schema=schema,
+            temperature=0, thinking_config=_THINKING[i](),
+        )
+        try:
+            resp = await asyncio.wait_for(
+                _get_client().aio.models.generate_content(model=model, contents=contents, config=config),
+                timeout=timeout,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if i + 1 < len(_THINKING) and "thinking" in str(exc).lower():
+                log.info("%s rejected thinking setting %d, trying the next one", model, i)
+                continue
+            raise
+        _thinking_choice[model] = i
+        return resp
+    raise AIError("no thinking setting worked")
+
+
 async def _ask_gemini(prompt, schema, files, model, timeout):
     parts = [types.Part.from_bytes(data=data, mime_type=mime) for data, mime in files]
     try:
-        resp = await asyncio.wait_for(
-            _get_client().aio.models.generate_content(
-                model=model or GEMINI_MODEL,
-                contents=[*parts, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                    temperature=0,
-                ),
-            ),
-            timeout=timeout,
-        )
+        resp = await _generate(model or GEMINI_MODEL, [*parts, prompt], schema, timeout)
     except AIError:
         raise
     except asyncio.TimeoutError as exc:

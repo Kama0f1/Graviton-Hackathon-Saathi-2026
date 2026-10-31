@@ -13,6 +13,7 @@ type Line = {
   from?: number;   // phone voice: sentence chunk to start at (resume)
   offset?: number; // Sarvam audio: seconds to start at (resume)
   at?: number;     // phone voice: chunk being spoken right now
+  t: number;       // when it was asked for (stale status lines are dropped, not read out late)
 };
 export type Caption = { text: string; priority: Priority; speaking: boolean };
 
@@ -40,9 +41,21 @@ function emit() {
 export function say(text: string, priority: Priority = 'answer', lang: Lang = getLang()) {
   text = text.trim();
   if (!text) return;
-  const line: Line = { text, priority, lang };
+  const line: Line = { text, priority, lang, t: Date.now() };
   if (priority !== 'info') last = line;
   const r = RANK[priority];
+  // Calm rules: one thing at a time.
+  // - a new answer replaces older answers (the person has moved on), including one that is speaking now
+  // - only the newest status line waits; old ones are dropped
+  if (priority === 'answer') {
+    queue = queue.filter((l) => l.priority !== 'answer');
+    if (current?.priority === 'answer') {
+      queue = [line, ...queue.filter((l) => l.priority !== 'info')];
+      cancelCurrent();
+      return;
+    }
+  }
+  if (priority === 'info') queue = queue.filter((l) => l.priority !== 'info');
   if (priority === 'alert') queue = queue.filter((l) => l.priority !== 'alert'); // only the newest alert matters
   if (current && r > RANK[current.priority]) {
     const cut = current;
@@ -60,6 +73,9 @@ export function say(text: string, priority: Priority = 'answer', lang: Lang = ge
   if (!current) next();
 }
 
+/** What is being spoken right now (null = quiet). Lets obstacle alerts stay silent during an answer. */
+export const speakingNow = (): Priority | null => current?.priority ?? null;
+
 export function stop() {
   queue = [];
   cancelCurrent();
@@ -70,6 +86,9 @@ export function repeat() {
 }
 
 function next() {
+  const now = Date.now();
+  // anything that waited too long is out of date: a late "person ahead" is worse than none
+  queue = queue.filter((l) => !(l.priority === 'info' && now - l.t > 5000) && !(l.priority === 'alert' && now - l.t > 3000));
   current = queue.shift() ?? null;
   if (current) shown = current;
   emit();

@@ -14,21 +14,21 @@ RULES = json.loads((Path(__file__).resolve().parent.parent / "data" / "waste_rul
 
 @router.post("/describe", response_model=SpeechOnly)
 async def describe(image: UploadFile = File(...), lang: str = Form("en"), session_id: str = Form("")):
-    data, mime = await media.read_upload(image, max_side=1024)
-    return await gemini.ask(prompts.load("describe", lang), SpeechOnly, [(data, mime)])
+    data, mime = await media.read_upload(image, max_side=768)  # 768 px = one Gemini image tile: fastest
+    return await gemini.ask(prompts.load("describe", lang), SpeechOnly, [(data, mime)], timeout=12)
 
 
 @router.post("/sign", response_model=SignResult)
 async def sign(image: UploadFile = File(...), lang: str = Form("en"), session_id: str = Form("")):
-    data, mime = await media.read_upload(image, max_side=1024)
-    return await gemini.ask(prompts.load("sign", lang), SignResult, [(data, mime)])
+    data, mime = await media.read_upload(image, max_side=1024)  # signs need a little more detail
+    return await gemini.ask(prompts.load("sign", lang), SignResult, [(data, mime)], timeout=12)
 
 
 @router.post("/waste", response_model=WasteResult)
 async def waste(image: UploadFile = File(...), lang: str = Form("en"), session_id: str = Form("")):
     lang = prompts.lang_code(lang)
-    data, mime = await media.read_upload(image, max_side=1024)
-    ai = await gemini.ask(prompts.load("waste", lang), AIWaste, [(data, mime)])
+    data, mime = await media.read_upload(image, max_side=768)
+    ai = await gemini.ask(prompts.load("waste", lang), AIWaste, [(data, mime)], timeout=12)
 
     # the rules file decides the bin, never the AI
     bin_color = RULES.get(ai.category, {}).get("bin_color") if ai.confident else None

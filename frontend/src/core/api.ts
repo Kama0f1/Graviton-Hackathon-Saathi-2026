@@ -58,6 +58,7 @@ export function onBusy(fn: (n: number) => void) {
   return () => { busyListeners.delete(fn) }
 }
 const setBusy = (d: number) => { busy = Math.max(0, busy + d); busyListeners.forEach((f) => f(busy)) }
+export const isBusy = () => busy > 0
 
 type Field = string | number | Blob | null | undefined
 type Opts = { timeoutMs?: number; quiet?: boolean; lang?: Lang }

@@ -1,5 +1,6 @@
 # Deploying Saathi on Vercel (backend + frontend)
 
+The backend runs in Vercel's Mumbai region (`bom1`, set in `backend/vercel.json`) so it is close to Indian users.
 Two Vercel projects from the **same GitHub repo**: one for `backend/`, one for `frontend/`.
 Both get HTTPS (the phone camera needs it) and redeploy on every `git push`. Free Hobby plan, no card.
 
@@ -16,6 +17,7 @@ Both get HTTPS (the phone camera needs it) and redeploy on every `git push`. Fre
    | `GROQ_API_KEY` | your key (backup AI) |
    | `GEMINI_MODEL` | `gemini-flash-lite-latest` |
    | `GEMINI_GUIDANCE_MODEL` | `gemini-flash-lite-latest` |
+   | `GEMINI_READ_MODEL` | optional. Default `gemini-flash-latest` (more accurate reading). Set to `gemini-flash-lite-latest` if reading feels slow |
    | `ALLOWED_ORIGINS` | `*` |
 5. **Deploy**. Check `https://saathi-api.vercel.app/health` → `{"ok":true}`, and `/docs` opens Swagger.
    (Your URL may differ: copy it from the project page.)
@@ -39,6 +41,10 @@ Then WhatsApp "Share → Saathi" works.
   (12 MB photo → about 1.7 MB) and says "file too big" for PDFs over 4 MB.
 - Each backend call may run up to 60 s (`backend/vercel.json`). Normal calls take 2–8 s.
 - First call after a quiet spell can take 2–3 s extra (cold start). Open `/health` before the pitch.
+
+## Directions
+Walking directions run on the phone (GPS + compass) using OpenStreetMap search (photon.komoot.io) and walking routes
+(routing.openstreetmap.de). No key needed. The phone must allow **Location** for the site.
 
 ## Troubleshooting
 | Problem | Fix |

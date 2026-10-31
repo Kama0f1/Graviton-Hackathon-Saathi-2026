@@ -7,6 +7,9 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
 GEMINI_GUIDANCE_MODEL = os.getenv("GEMINI_GUIDANCE_MODEL", "gemini-flash-lite-latest")
+# Read mode (documents, bills, money) needs accuracy more than speed: the stronger Flash model, thinking off.
+# If it is ever too slow, set GEMINI_READ_MODEL=gemini-flash-lite-latest (no code change).
+GEMINI_READ_MODEL = os.getenv("GEMINI_READ_MODEL", "gemini-flash-latest")
 
 # optional backup AI, used only when Gemini fails or times out (images only, no PDFs)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")

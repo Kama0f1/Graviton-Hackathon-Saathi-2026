@@ -6,7 +6,7 @@ import { shutter } from './audio'
 import { haptics } from './haptics'
 import { t } from '../i18n/phrases'
 
-const ARROW: Record<string, string> = { left: '←', right: '→', up: '↑', down: '↓', closer: '⤢', back: '⤡', hold: '✋', light: '💡', none: '…' }
+const ARROW: Record<string, string> = { left: '←', right: '→', up: '↑', down: '↓', closer: '⤢', back: '⤡', hold: '■', light: '☀', none: '…' }
 
 export function startGuidance(
   grab: (maxSide?: number, quality?: number) => Promise<Blob | null>,
@@ -17,6 +17,7 @@ export function startGuidance(
   let active = true
   let readyCount = 0
   let lastSpoken = ''
+  let lastSpokenAt = 0
   const started = Date.now()
   say(t('guideStart'), 'answer')
   onHint({ arrow: '◎', text: t('guideStart'), ready: false })
@@ -40,7 +41,7 @@ export function startGuidance(
         readyCount = g.ready ? readyCount + 1 : 0
         if (g.speech || g.ready) onHint({ arrow: ARROW[g.move] ?? '…', text: g.speech || t('captured'), ready: g.ready })
         if (readyCount >= 2) { say(t('captured'), 'info'); await capture(); return }
-        if (g.speech && g.speech !== lastSpoken) { lastSpoken = g.speech; say(g.speech, 'info') }
+        if (g.speech && g.speech !== lastSpoken && Date.now() - lastSpokenAt > 2500) { lastSpoken = g.speech; lastSpokenAt = Date.now(); say(g.speech, 'info') }
       } catch { /* slow or failed frame: try the next one */ }
     }
     if (active) setTimeout(step, 1600)

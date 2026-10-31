@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, UploadFile
 
 from ..schemas import AIMoney, MoneyItem, MoneyResult, SuspectNote
+from ..config import GEMINI_READ_MODEL
 from ..services import gemini, media, prompts, session
 from ..services.phrases import say_money, t
 
@@ -43,7 +44,7 @@ async def money(
     lang = prompts.lang_code(lang)
     mode = mode if mode in ("count", "change", "check") else "count"
     data, mime = await media.read_upload(image)
-    ai = await gemini.ask(prompts.load("money", lang), AIMoney, [(data, mime)])
+    ai = await gemini.ask(prompts.load("money", lang), AIMoney, [(data, mime)], model=GEMINI_READ_MODEL, timeout=18)
 
     cur = (ai.currency or "INR").strip().upper() or "INR"
     items = [MoneyItem(value=i.value, kind=i.kind, count=i.count) for i in ai.items if i.count > 0]

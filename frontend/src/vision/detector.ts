@@ -1,9 +1,11 @@
 // Obstacle alerts (built on Arush's COCO-SSD detection): runs on the phone, no internet needed after load.
 // Close objects are spoken as ALERTS (they interrupt anything else); far ones as low-priority info.
 import { useEffect, useRef, useState } from 'react'
-import { say } from '../core/speech'
+import { say, speakingNow } from '../core/speech'
+import { isBusy } from '../core/api'
+import { beep } from '../core/audio'
 import { haptics } from '../core/haptics'
-import { getLang, type Lang } from '../core/settings'
+import { canVibrate, getLang, getVibrate, type Lang } from '../core/settings'
 import { t } from '../i18n/phrases'
 
 type Position = 'left' | 'centre' | 'right'
@@ -24,6 +26,8 @@ const NAMES: Record<Lang, Record<string, string>> = {
         cat: 'ਬਿੱਲੀ', 'potted plant': 'ਗਮਲਾ', tv: 'ਟੀਵੀ', laptop: 'ਲੈਪਟਾਪ', 'cell phone': 'ਫ਼ੋਨ', suitcase: 'ਸੂਟਕੇਸ' },
 }
 
+const PEOPLE: Record<Lang, string> = { en: 'people', hi: 'लोग', pa: 'ਲੋਕ' }
+
 export type Seen = { name: string; pos: Position; close: boolean } | null
 
 export function useObstacles(
@@ -31,6 +35,7 @@ export function useObstacles(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   enabled: boolean,
   mirrored: boolean,
+  onlyClose = false,   // while walking directions: speak only things that are about to be in the way
 ) {
   const [status, setStatus] = useState('')
   const [count, setCount] = useState(0)
@@ -40,6 +45,9 @@ export function useObstacles(
   const lastSaid = useRef(new Map<string, number>())
   const lastAny = useRef(0)
   const lastBuzz = useRef(0)
+  const history = useRef<Set<string>[]>([])  // what was seen in the last 3 frames (one-frame flickers are ignored)
+  const onlyCloseRef = useRef(onlyClose)
+  onlyCloseRef.current = onlyClose
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -58,7 +66,7 @@ export function useObstacles(
       if (!active || !video || !c) return
       if (video.readyState < 2 || !video.videoWidth) { timer = window.setTimeout(run, 300); return }
       try {
-        const preds = (await detectObjects(video)).filter((p) => p.score >= 0.5)
+        const preds = await detectObjects(video)
         if (!active) return
         const ctx = c.getContext('2d')
         c.width = video.videoWidth
@@ -77,6 +85,8 @@ export function useObstacles(
           ctx.setLineDash([])
         }
         let biggest: { area: number; seen: NonNullable<Seen> } | null = null
+        let best: { key: string; cls: string; pos: Position; close: boolean; area: number; importance: number } | null = null
+        const frameKeys = new Set<string>()
         for (const p of preds) {
           const [bx, y, w, h] = p.bbox
           // on a front/laptop camera the preview is mirrored: flip x so left/right match what the user sees
@@ -84,32 +94,63 @@ export function useObstacles(
           const cx = (x + w / 2) / W
           const pos: Position = cx < 0.38 ? 'left' : cx > 0.62 ? 'right' : 'centre'
           const area = (w * h) / (W * H)
-          const close = area >= 0.15
+          const close = area >= 0.12
           if (!biggest || area > biggest.area) biggest = { area, seen: { name: NAMES[lang][p.class] ?? p.class, pos, close } }
           if (ctx) {
-            ctx.strokeStyle = close ? '#ff6b5e' : '#2fd3b0'
+            ctx.strokeStyle = close ? '#ff3b3b' : '#ffd400'
             ctx.lineWidth = 6
             ctx.strokeRect(x, y, w, h)
             ctx.font = 'bold 30px system-ui, sans-serif'
             const label = `${NAMES[lang][p.class] ?? p.class} · ${t(pos)}`
-            ctx.fillStyle = close ? '#b3261e' : '#0f6f5c'
+            ctx.fillStyle = close ? '#c4000f' : '#ffd400'
             ctx.fillRect(x, Math.max(0, y - 42), ctx.measureText(label).width + 20, 42)
-            ctx.fillStyle = '#fff'
+            ctx.fillStyle = close ? '#fff' : '#000'
             ctx.fillText(label, x + 10, Math.max(32, y - 11))
           }
-          if (p.score < 0.62) continue
-          // speech: same object+side at most every 6 s; anything at most every 2.5 s (close ones: 1.5 s)
-          const key = `${p.class}-${pos}`
-          if (now - (lastSaid.current.get(key) ?? 0) < 6000) continue
-          if (now - lastAny.current < (close ? 1500 : 2500)) continue
-          lastSaid.current.set(key, now)
-          lastAny.current = now
-          const name = NAMES[lang][p.class] ?? p.class
-          const text = `${name} ${POS[lang][pos]}${close ? CLOSE[lang] : ''}.`
-          say(lang === 'en' ? text.charAt(0).toUpperCase() + text.slice(1) : text, close ? 'alert' : 'info')
-          if (now - lastBuzz.current > 1500 && area >= 0.15) {
-            lastBuzz.current = now
-            if (area >= 0.35) haptics.veryNear(); else haptics.near()
+          if (p.score >= 0.45) frameKeys.add(`${p.class}-${pos}`)
+          // only things that matter for walking are spoken: anything close, or something fairly near straight ahead
+          const importance = close ? 2 : pos === 'centre' && area >= 0.06 && !onlyCloseRef.current ? 1 : 0
+          if (p.score < (close ? 0.45 : 0.6) || !importance) continue
+          if (!best || importance > best.importance || (importance === best.importance && area > best.area)) {
+            best = { key: `${p.class}-${pos}`, cls: p.class, pos, close, area, importance }
+          }
+        }
+        history.current = [...history.current.slice(-2), frameKeys]
+        if (best && history.current.filter((k) => k.has(best!.key)).length >= 2) {
+          const b = best
+          const sameAgo = now - (lastSaid.current.get(b.key) ?? 0)
+          const anyAgo = now - lastAny.current
+          if (sameAgo > 8000 && anyAgo > (b.close ? 2500 : 5000)) {
+            lastSaid.current.set(b.key, now)
+            lastAny.current = now
+            if (speakingNow() === 'answer' || isBusy()) {
+              // never talk over an answer: a close thing gets a warning beep instead of words
+              if (b.close) beep(440, 160, 0.3)
+            } else {
+              const n = preds.filter((q) => q.class === b.cls && q.score >= 0.55).length
+              const name = b.cls === 'person' && n > 1 ? `${n} ${PEOPLE[lang]}` : NAMES[lang][b.cls] ?? b.cls
+              const text = `${name} ${POS[lang][b.pos]}${b.close ? CLOSE[lang] : ''}.`
+              say(lang === 'en' ? text.charAt(0).toUpperCase() + text.slice(1) : text, b.close ? 'alert' : 'info')
+            }
+          }
+        }
+        // ---- proximity feel (separate from speech, every frame): the closer, the faster and stronger ----
+        // nearest thing = biggest box in the middle 70% of the view (things at the very edge are not in the way)
+        let near = 0
+        for (const p of preds) {
+          const [bx, , w, h] = p.bbox
+          const cx = (bx + w / 2) / W
+          if (cx < 0.15 || cx > 0.85) continue
+          near = Math.max(near, (w * h) / (W * H))
+        }
+        const level = near >= 0.45 ? 3 : near >= 0.25 ? 2 : near >= 0.12 ? 1 : 0
+        const every = [0, 1500, 900, 550][level]
+        if (level && now - lastBuzz.current > every) {
+          lastBuzz.current = now
+          if (canVibrate() && getVibrate()) {
+            if (level === 3) haptics.veryNear(); else if (level === 2) haptics.near(); else haptics.nearSoft()
+          } else {
+            beep(500 + level * 250, 70, 0.25) // iPhone / vibration off: a parking-sensor beep instead
           }
         }
         setSeen(biggest?.seen ?? null)

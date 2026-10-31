@@ -8,8 +8,9 @@ export const haptics = {
   tap: () => buzz(30),
   success: () => buzz([60, 60, 60]),
   warning: () => buzz([250, 120, 250, 120, 250]),
-  near: () => buzz(150),
-  veryNear: () => buzz([200, 100, 200]),
+  near: () => buzz([180, 70, 180]),       // stronger as things get closer
+  veryNear: () => buzz(400),
+  nearSoft: () => buzz(120),
   test: () => { if (canVibrate()) navigator.vibrate([200, 100, 200]) }, // works even when off, for the test button
   stop: () => { if (canVibrate()) navigator.vibrate(0) },
 }

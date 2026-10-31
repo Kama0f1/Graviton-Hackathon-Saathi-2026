@@ -8,7 +8,7 @@ import { api, ApiError, type MoneyMode, type ReadResult } from '../core/api'
 import { say } from '../core/speech'
 import { haptics } from '../core/haptics'
 import { startGuidance } from '../core/guidance'
-import { fromMoney, fromRead, fromSpeech, money, type ResultView } from '../core/result'
+import { fromMoney, fromRead, fromSpeech, money, type ResultSrc, src } from '../core/result'
 import type { Command } from '../core/listen'
 import { frame } from './useFrame'
 import { t } from '../i18n/phrases'
@@ -36,7 +36,7 @@ export default function ReadMode({ command, shared }: {
   shared: Blob | null
 }) {
   const cam = useCamera()
-  const [result, setResult] = useState<ResultView | null>(null)
+  const [result, setResult] = useState<ResultSrc | null>(null)
   const [guiding, setGuiding] = useState(false)
   const [question, setQuestion] = useState('')
   const [hint, setHint] = useState<{ arrow: string; text: string; ready: boolean } | null>(null)
@@ -62,7 +62,7 @@ export default function ReadMode({ command, shared }: {
       const r = await api.read(file)
       lastRead.current = r
       const view = fromRead(r)
-      setResult(view)
+      setResult(src(() => fromRead(r)))
       say(r.speech, 'answer')
       if (view.tone === 'warning') haptics.warning(); else haptics.success()
     } finally {
@@ -101,7 +101,7 @@ export default function ReadMode({ command, shared }: {
     const d = lastRead.current
     const context = d ? JSON.stringify({ doc_type: d.doc_type, text: d.full_text ?? d.speech_more, fields: d.key_fields }) : undefined
     const r = await api.ask(q.trim(), context)
-    setResult(fromSpeech('ANSWER', r))
+    setResult(src(() => fromSpeech(t('lblAnswer'), r)))
     say(r.speech, 'answer')
     setQuestion('')
   })
@@ -115,7 +115,7 @@ export default function ReadMode({ command, shared }: {
     if (mode === 'change' && paid.current != null) extra.paid = paid.current
     const r = await api.money(img, mode, extra)
     const view = fromMoney(r)
-    setResult(view)
+    setResult(src(() => fromMoney(r)))
     say(r.speech, r.suspicious.length ? 'alert' : 'answer')
     if (view.tone === 'warning') haptics.warning(); else if (view.tone === 'success') haptics.success()
     if (mode === 'count') paid.current = r.paid ?? undefined
@@ -138,7 +138,7 @@ export default function ReadMode({ command, shared }: {
 
   return (
     <div className="mode">
-      <CameraView cam={cam} badge={guiding ? `◎ ${t('scan')}` : undefined} overlay={
+      <CameraView cam={cam} badge={guiding ? t('scan') : undefined} overlay={
         reading ? (
           <div className="scan-overlay reading" aria-hidden="true">
             {preview && <img src={preview} alt="" />}
@@ -151,21 +151,24 @@ export default function ReadMode({ command, shared }: {
           </div>
         ) : null
       } />
-      <ResultCard r={result} />
+      <ResultCard src={result} />
       <div className="actions">
-        <button type="button" className={`action primary ${guiding ? 'on' : ''}`} aria-pressed={guiding} onClick={guide} disabled={reading}>
-          <span aria-hidden="true">◎</span>{guiding ? t('stop') : t('scan')}</button>
-        <button type="button" className="action" onClick={() => void snap()} disabled={reading || guiding}><span aria-hidden="true">📷</span>{t('quickPhoto')}</button>
-        <button type="button" className="action" onClick={() => fileInput.current?.click()}><span aria-hidden="true">⬆</span>{t('upload')}</button>
-        <button type="button" className="action" onClick={more}><span aria-hidden="true">＋</span>{t('more')}</button>
-        <button type="button" className="action money" onClick={() => void moneyCheck('count')}><span aria-hidden="true">₹</span>{t('count')}</button>
-        <button type="button" className="action money" onClick={() => void moneyCheck('change')}><span aria-hidden="true">⇄</span>{t('change')}</button>
-        <button type="button" className="action money wide" onClick={() => void moneyCheck('check')}><span aria-hidden="true">🛡</span>{t('note')}</button>
+        <button type="button" className={`btn primary full ${guiding ? 'on' : ''}`} aria-pressed={guiding} onClick={guide} disabled={reading}>
+          {guiding ? t('stop') : t('scanDoc')}</button>
+        <button type="button" className="btn" onClick={() => void snap()} disabled={reading || guiding}>{t('quickPhoto')}</button>
+        <button type="button" className="btn" onClick={() => fileInput.current?.click()}>{t('upload')}</button>
+      </div>
+      <h3 className="group">{t('money')}</h3>
+      <div className="actions three">
+        <button type="button" className="btn" onClick={() => void moneyCheck('count')}>{t('count')}</button>
+        <button type="button" className="btn" onClick={() => void moneyCheck('change')}>{t('change')}</button>
+        <button type="button" className="btn" onClick={() => void moneyCheck('check')}>{t('note')}</button>
       </div>
       <form className="ask" onSubmit={(e) => { e.preventDefault(); void ask(question) }}>
-        <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('askPlaceholder')} aria-label={t('askPlaceholder')} />
+        <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('askPlaceholder')} aria-label={t('askPlaceholder')} enterKeyHint="send" />
         <button type="submit">{t('ask')}</button>
       </form>
+      <button type="button" className="toggle wide" onClick={more}>{t('more2')}</button>
       <input ref={fileInput} type="file" accept="image/*,application/pdf" hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = '' }} />
     </div>

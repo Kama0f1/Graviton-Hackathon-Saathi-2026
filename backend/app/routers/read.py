@@ -4,6 +4,8 @@ from typing import Optional
 
 from fastapi import APIRouter, File, Form, UploadFile
 
+from ..config import GEMINI_READ_MODEL
+
 from ..schemas import AIRead, Bill, BillItem, ReadResult, SpeechOnly
 from ..services import bill_check, gemini, media, prompts, session
 from ..services.phrases import qty, say_money, t
@@ -44,7 +46,7 @@ def _item_line(item: BillItem, currency: str, lang: str) -> str:
 async def read(file: UploadFile = File(...), lang: str = Form("en"), session_id: str = Form("")):
     lang = prompts.lang_code(lang)
     data, mime = await media.read_upload(file, allow_pdf=True, max_side=1600)  # bills need detail
-    ai = await gemini.ask(prompts.load("read", lang), AIRead, [(data, mime)])
+    ai = await gemini.ask(prompts.load("read", lang), AIRead, [(data, mime)], model=GEMINI_READ_MODEL, timeout=22)
     fields = {f.name: f.value for f in ai.key_fields}
     session.save(session_id, {"doc_type": ai.doc_type, "text": ai.full_text, "fields": fields})
 
@@ -101,4 +103,4 @@ async def ask(question: str = Form(...), lang: str = Form("en"), session_id: str
         "ask", lang, doc_type=doc["doc_type"], fields=fields,
         text=doc["text"][:20000], question=question.strip()[:500],
     )
-    return await gemini.ask(prompt, SpeechOnly)
+    return await gemini.ask(prompt, SpeechOnly, model=GEMINI_READ_MODEL, timeout=15)

@@ -1,14 +1,14 @@
-// The big answer card. Warnings are red with an icon + words (never colour alone).
-import type { ResultView } from '../core/result'
+// The answer card. Warnings are a red block with words (never colour alone).
+import type { ResultSrc } from '../core/result'
 
-const ICON = { info: 'ℹ', warning: '⚠', success: '✓' } as const
-
-export default function ResultCard({ r }: { r: ResultView | null }) {
-  if (!r) return null
+export default function ResultCard({ src }: { src: ResultSrc | null }) {
+  if (!src) return null
+  const r = src.make() // built at render time, so switching language re-labels the card
   return (
     <section className={`result result-${r.tone}`} aria-live="polite">
       <div className="result-label">
-        <span aria-hidden="true">{ICON[r.tone]}</span> {r.label}
+        {r.tone === 'warning' && <span aria-hidden="true">!</span>}
+        {r.label}
         {r.swatch && <span className={`swatch swatch-${r.swatch}`} aria-hidden="true" />}
       </div>
       <p className="result-headline">{r.headline}</p>

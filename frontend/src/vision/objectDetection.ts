@@ -22,5 +22,7 @@ export async function loadDetectionModel() {
 
 export async function detectObjects(video: HTMLVideoElement) {
   const detectionModel = await loadDetectionModel()
-  return detectionModel.detect(video)
+  // minScore 0.35 (default 0.5): an object right in front of the camera is cut off by the frame edges,
+  // which makes the model less sure. We still want it, because that is exactly when to warn.
+  return detectionModel.detect(video, 20, 0.35)
 }

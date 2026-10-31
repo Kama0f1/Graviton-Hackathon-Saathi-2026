@@ -16,7 +16,6 @@ export default function CameraView({ cam, canvasRef, badge, badgeAlert, overlay 
       {canvasRef && <canvas ref={canvasRef} className="camera-overlay" aria-hidden="true" />}
       {!cam.on && (
         <button type="button" className="camera-start" onClick={() => void cam.start()} disabled={cam.starting}>
-          <span aria-hidden="true">📷</span>
           {cam.starting ? t('cameraStarting') : cam.error || t('cameraOff')}
         </button>
       )}

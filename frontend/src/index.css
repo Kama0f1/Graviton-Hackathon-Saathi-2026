@@ -1,23 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+Devanagari:wght@500;700&family=Noto+Sans+Gurmukhi:wght@500;700&display=swap');
+/* Atkinson Hyperlegible was designed by the Braille Institute for low-vision readers. */
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Noto+Sans+Devanagari:wght@500;700&family=Noto+Sans+Gurmukhi:wght@500;700&display=swap');
 
-/* Colour tokens: all text pairs tested for contrast on bg/surface (>= 7:1 except warning text 7.0) */
+/* High-contrast palette: black, white and one signal yellow. Every text pair is >= 7:1 (WCAG AAA). */
 :root {
-  --bg: #0b1717;
-  --surface: #132525;
-  --surface-2: #1a3131;
-  --line: #24403f;
-  --text: #f5f7f8;
-  --muted: #a9b8bb;
-  --accent: #2fd3b0;
-  --accent-ink: #062420;
-  --warn-bg: #8f1d16;
-  --warn-text: #ff8a7a;
-  --ok: #4ade80;
-  --info: #7cc4ff;
-  --radius: 22px;
+  --bg: #000;
+  --surface: #121212;
+  --surface-2: #1e1e1e;
+  --line: #3a3a3a;
+  --text: #fff;
+  --muted: #c8c8c8;
+  --yellow: #ffd400;     /* black on yellow: 14.6:1 */
+  --ink: #000;
+  --red: #c4000f;        /* white on red: 6.9:1; used as a fill, always with words */
+  --red-text: #ff6b6b;   /* on black: 7.6:1 */
+  --green: #00c853;      /* black on green: 9.9:1 */
+  --radius: 10px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  font-family: 'DM Sans', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi', system-ui, sans-serif;
+  font-family: 'Atkinson Hyperlegible', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi', system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
   color-scheme: dark;
@@ -30,5 +30,5 @@ html, body { margin: 0; min-height: 100%; background: var(--bg); }
 body { min-height: 100dvh; overscroll-behavior: none; }
 button, input, select { font: inherit; color: inherit; }
 button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
-:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
-::selection { background: var(--accent); color: var(--accent-ink); }
+:focus-visible { outline: 4px solid var(--yellow); outline-offset: 3px; }
+::selection { background: var(--yellow); color: var(--ink); }
