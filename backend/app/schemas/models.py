@@ -92,3 +92,11 @@ class HazardResult(BaseModel):
     metres: float = 0     # rounded: 0.5 m steps up to 2 m, then whole metres
     urgent: bool = False        # close or a drop: the phone interrupts and vibrates
     speech: str = ""            # empty when there is nothing worth saying
+
+
+class BinSpotResult(BaseModel):
+    found: bool = False
+    position: Literal["left", "ahead", "right"] = "ahead"
+    metres: float = 0
+    color: str = ""
+    speech: str = ""            # what to say: where the bin is, or "turn slowly"

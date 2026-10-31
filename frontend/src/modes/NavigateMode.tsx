@@ -15,7 +15,8 @@ import type { Command } from '../core/listen'
 import { useSettings } from '../core/useSettings'
 import { useObstacles } from '../vision/detector'
 import { useHazardWatch } from '../vision/hazardWatch'
-import { startBinFinder, type BinColor } from '../vision/binFinder'
+import { type BinColor } from '../vision/binFinder'
+import { startAiBinFinder } from '../vision/aiBinFinder'
 import { getPosition, inMetres, rp, sayDist, startCompass, startDirections, whereAmI, type RouteView } from '../core/route'
 import { frame } from './useFrame'
 import { t } from '../i18n/phrases'
@@ -81,14 +82,13 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
     setBin(r.bin_color)
     if (r.bin_color) haptics.success()
   })
+  // Finds any dustbin (the AI looks), preferring the colour /waste asked for. No need to ask "which bin" first.
   const findBin = () => {
-    if (finding) { stopFinder.current?.(); stopFinder.current = null; setFinding(false); return }
-    if (!bin) { say(t('binFirst'), 'answer'); return }
-    if (!cam.videoRef.current) return
-    stopFinder.current = startBinFinder(cam.videoRef.current, bin)
+    if (finding) { stopFinder.current?.(); stopFinder.current = null; setFinding(false); say(t('binStop'), 'info'); return }
+    setTool('bin')
+    stopFinder.current = startAiBinFinder(cam.grab, bin)
     setFinding(true)
   }
-
   const go = (place: string) => {
     place = place.trim()
     if (!place) { say(rp('whereTo'), 'answer'); return }
@@ -122,7 +122,7 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
       case 'ahead': void ahead(); break
       case 'sign': void sign(); break
       case 'bin': void whatBin(); break
-      case 'findBin': findBin(); break
+      case 'findBin': if (!finding) findBin(); break   // asking again while searching keeps searching
       case 'route': go(command.place); break
       case 'directions': if (routing) repeatStep(); else say(rp('whereTo'), 'answer'); break
       case 'whereAmI': void locate(); break
@@ -186,10 +186,9 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
         {tool === 'sign' && <button type="button" className="pill-btn" onClick={() => void sign()}><Icon name="sign" />{t('readSignBtn')}</button>}
         {tool === 'bin' && (
           <>
-            <button type="button" className="pill-btn" onClick={() => void whatBin()}><Icon name="bin" />{t('whichBinBtn')}</button>
-            <button type="button" className={`round big ${finding ? 'danger' : ''}`} aria-pressed={finding} onClick={findBin} disabled={!bin && !finding}
-              aria-label={finding ? t('stopFinding') : bin ? t('findBinBtn', { c: t(bin) }) : t('findBin')}>
-              <Icon name={finding ? 'stop' : 'nav'} /></button>
+            <button type="button" className="pill-btn" onClick={() => void whatBin()}><Icon name="bin" />{t('bin')}</button>
+            <button type="button" className={`pill-btn light ${finding ? 'on' : ''}`} aria-pressed={finding} onClick={findBin}>
+              <Icon name={finding ? 'stop' : 'nav'} />{finding ? t('stop') : t('findBin')}</button>
           </>
         )}
         {tool === 'route' && (routing ? (

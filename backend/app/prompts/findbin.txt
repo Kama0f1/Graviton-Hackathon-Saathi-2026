@@ -1,0 +1,11 @@
+A blind person is looking for a dustbin (waste bin, trash can, garbage bin, recycling bin) to throw something away.
+They hold the phone at chest height with the camera facing forward and turn slowly. {want}
+
+Answer:
+- `found`: true only if you can actually see a dustbin or waste bin in this picture. A poster, sign, box, bag or bucket is not a bin.
+  If several bins are visible, pick the one that matches what they want; otherwise the nearest one.
+- `position`: left / ahead / right, where the bin is in the picture as seen from the camera.
+- `metres`: how far away the bin is, your best estimate (a normal dustbin is about 0.6 to 1 m tall). 0 means within arm's reach.
+- `color`: the bin's main colour (steel for metal bins).
+
+If no bin is visible, answer found false, position ahead, metres 0, color other. Never guess.

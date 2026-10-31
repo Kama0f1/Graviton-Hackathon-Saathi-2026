@@ -70,3 +70,10 @@ class AIHazard(BaseModel):
     hazard: HAZARDS
     position: Literal["left", "ahead", "right"]
     metres: float   # how far away; clamped and rounded in Python
+
+
+class AIBinSpot(BaseModel):
+    found: bool                      # a dustbin / waste bin is visible
+    position: Literal["left", "ahead", "right"]
+    metres: float                    # how far away; clamped and rounded in Python
+    color: Literal["blue", "green", "red", "yellow", "grey", "black", "steel", "other"]

@@ -142,6 +142,7 @@
 .action-row > .round.big { width: 58px; height: 64px; border-radius: 29px; }
 .action-row:has(> .round + .round) > .pill-btn .icon { display: none; }  /* tight row: words only */
 .action-row > .pill-btn.light { flex: 0.85; }
+.action-row > .pill-btn.light.on { background: var(--red); color: #fff; }
 .action-row > .ask { flex: 1; min-width: 0; }
 .round.danger { background: var(--red); color: #fff; }
 .round:disabled { opacity: 0.45; }

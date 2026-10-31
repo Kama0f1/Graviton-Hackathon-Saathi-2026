@@ -1,11 +1,12 @@
-"""Navigate mode: /describe (scene), /sign (read a sign), /waste (item -> bin), /hazard (stairs, walls... while walking)."""
+"""Navigate mode: /describe (scene), /sign (read a sign), /waste (item -> bin), /hazard (stairs, walls... while walking),
+/findbin (where is the nearest dustbin)."""
 import json
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
 
 from ..config import GEMINI_GUIDANCE_MODEL
-from ..schemas import AIHazard, AIWaste, HazardResult, SignResult, SpeechOnly, WasteResult
+from ..schemas import AIBinSpot, AIHazard, AIWaste, BinSpotResult, HazardResult, SignResult, SpeechOnly, WasteResult
 from ..services import gemini, groq, media, prompts
 from ..services.errors import AIError
 from ..services.phrases import t
@@ -76,6 +77,35 @@ async def hazard(image: UploadFile = File(...), lang: str = Form("en"), session_
     else:
         speech = t("hz_at", lang, thing=thing, pos=pos, d=say_metres(metres, lang))
     return HazardResult(hazard=ai.hazard, position=ai.position, metres=metres, urgent=urgent, speech=speech)
+
+
+@router.post("/findbin", response_model=BinSpotResult)
+async def findbin(image: UploadFile = File(...), lang: str = Form("en"), color: str = Form(""), session_id: str = Form("")):
+    """Called by the phone every couple of seconds while the person turns, looking for a dustbin.
+    `color` (blue/green/red) is the bin /waste asked for, if any. The AI only locates; Python builds the words."""
+    lang = prompts.lang_code(lang)
+    data, mime = await media.read_upload(image, max_side=640)
+    want = f"They want the {color} bin, so prefer a {color} one if you see it." if color in ("blue", "green", "red") else ""
+    prompt = prompts.load("findbin", lang, want=want)
+    try:
+        ai = await gemini.ask(prompt, AIBinSpot, [(data, mime)], model=GEMINI_GUIDANCE_MODEL, timeout=6, fallback=False)
+    except AIError as exc:
+        if "too long" in str(exc):
+            return BinSpotResult(found=False, speech=t("bf_none", lang))
+        if "rate limit" in str(exc) and groq.available([(data, mime)]):
+            ai = await groq.ask(prompt, AIBinSpot, [(data, mime)], timeout=6)
+        else:
+            raise
+    if not ai.found:
+        return BinSpotResult(found=False, speech=t("bf_none", lang))
+    metres = max(0.0, min(20.0, float(ai.metres)))
+    metres = round(metres * 2) / 2 if metres < 2 else float(round(metres))
+    thing = t("bf_col", lang, c=t("col_" + ai.color, lang)) if ai.color not in ("other",) else t("bf_bin", lang)
+    if metres < 0.75:
+        speech = t("bf_here", lang, thing=thing)
+    else:
+        speech = t("bf_at", lang, thing=thing, pos=t("pos_" + ai.position, lang), d=say_metres(metres, lang))
+    return BinSpotResult(found=True, position=ai.position, metres=metres, color=ai.color, speech=speech)
 
 
 def say_metres(m: float, lang: str) -> str:

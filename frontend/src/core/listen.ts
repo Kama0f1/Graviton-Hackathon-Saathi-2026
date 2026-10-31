@@ -45,15 +45,26 @@ function routePlace(s: string): string | null {
   return place
 }
 
+// The recogniser often hears "bin" as ben / been / bean / bun ("where is the ben"). Fix it only where a bin makes
+// sense (after "the", "a", "dust", "which", "where is"...), so "I have been there" is left alone.
+const BIN_SOUNDS = '(?:bin|ben|been|bean|bun|binn|bins|ban|pin|bean)'
+const fixBin = (s: string) => s
+  .replace(new RegExp(`\\bdust ?${BIN_SOUNDS}\\b`, 'g'), 'dustbin')
+  .replace(new RegExp(`\\b(the|a|which|what|nearest|closest|garbage|trash|waste|recycling|kachra|kooda|where's|wheres|where is|find|show me|locate)\\s+${BIN_SOUNDS}\\b`, 'g'), '$1 bin')
+// "where is the bin", "where's a dustbin", "show me the bin", "take me to the bin", "find a trash can"
+const FIND_BIN = /\b(where|where's|wheres|find|show|locate|search|look for|guide me|take me|lead me|nearest|closest|any)\b.*\b(bin|dustbin|trash can|trash|garbage can|kachra|kooda|kudedan)( please| here| now)?$/
+// Hinglish heard as English: "dustbin kahan hai", "kachra kidhar"
+const BIN_WHERE = /\b(bin|dustbin|kachra|kooda|kudedan)\b.*\b(kahan|kaha|kidhar|kithe|kitthe)\b/
+
 const QUESTION = /^(what|when|who|how much|how many|which|why|is there|does|do i|can i|क्या|कब|कितना|कितने|कौन|किस|ਕੀ|ਕਦੋਂ|ਕਿੰਨਾ|ਕਿੰਨੇ|ਕੌਣ)/
 
 /** Parse one transcript. Returns null when it is not a known command (caller may treat it as a question). */
 export function matchCommand(raw: string, mode: Mode, allowWeak = true): Command | null {
-  const s = raw.toLowerCase().replace(/[?!.,।]/g, ' ').replace(/\s+/g, ' ').trim()
+  const s = fixBin(raw.toLowerCase().replace(/[?!.,।]/g, ' ').replace(/\s+/g, ' ').trim())
   if (!s) return null
   const n = words(s)
 
-  if (has(s, ['find bin', 'find the bin', 'where is the bin', 'nearest bin', 'डिब्बा कहाँ', 'डिब्बा ढूँढ', 'डिब्बा ढूंढ', 'ਡੱਬਾ ਕਿੱਥੇ', 'ਡੱਬਾ ਲੱਭ'])) return { cmd: 'findBin' }
+  if (FIND_BIN.test(s) || BIN_WHERE.test(s) || has(s, ['find bin', 'find the bin', 'where is the bin', 'nearest bin', 'डिब्बा कहाँ', 'डिब्बा कहां', 'डिब्बा ढूँढ', 'डिब्बा ढूंढ', 'डस्टबिन कहाँ', 'डस्टबिन कहां', 'कूड़ेदान कहाँ', 'ਡੱਬਾ ਕਿੱਥੇ', 'ਡੱਬਾ ਲੱਭ', 'ਡਸਟਬਿਨ ਕਿੱਥੇ'])) return { cmd: 'findBin' }
   // directions next: "go to ..." contains words that would otherwise look like other commands
   const place = routePlace(s)
   if (place) return { cmd: 'route', place }

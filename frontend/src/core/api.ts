@@ -30,6 +30,7 @@ export type ReadResult = {
   doc_type: string | null; key_fields: Record<string, string>
   bill: Bill | null; uncertain: string[]
 }
+export type BinSpot = { found: boolean; position: 'left' | 'ahead' | 'right'; metres: number; color: string; speech: string }
 export type HazardResult = { hazard: string; position: 'left' | 'ahead' | 'right'; metres: number; urgent: boolean; speech: string }
 export type MoneyMode = 'count' | 'change' | 'check'
 export type MoneyResult = {
@@ -116,6 +117,8 @@ export const api = {
   guidance: (image: Blob, target: 'document' | 'bill' = 'document') =>
     json<GuidanceResult>(post('/guidance', { image, target }, { quiet: true, timeoutMs: 9000 })),
   // walking hazard check: quiet (no 'thinking' tick, no spoken errors), short timeout: the next frame is coming anyway
+  findBin: (image: Blob, color?: string | null) =>
+    json<BinSpot>(post('/findbin', { image, color: color ?? '' }, { quiet: true, timeoutMs: 8000 })),
   hazard: (image: Blob) => json<HazardResult>(post('/hazard', { image }, { quiet: true, timeoutMs: 7000 })),
   read: (file: Blob) => json<ReadResult>(post('/read', { file }, { timeoutMs: 45000 })),
   // `context` = the document the app read last, so questions work even if the server forgot it (serverless)

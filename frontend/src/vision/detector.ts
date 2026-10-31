@@ -63,6 +63,26 @@ const NAMES: Record<Lang, Record<string, string>> = {
         cat: 'ਬਿੱਲੀ', 'potted plant': 'ਗਮਲਾ', tv: 'ਟੀਵੀ', laptop: 'ਲੈਪਟਾਪ', 'cell phone': 'ਫ਼ੋਨ', suitcase: 'ਸੂਟਕੇਸ' },
 }
 
+// Not things you walk into, and the usual false alarms (a poster or notice board read as a TV or fridge): ignored.
+const IGNORE = new Set([
+  'tv', 'laptop', 'clock', 'book', 'cell phone', 'remote', 'mouse', 'keyboard', 'kite', 'frisbee', 'sports ball',
+  'toothbrush', 'hair drier', 'scissors', 'teddy bear', 'microwave', 'toaster', 'oven', 'tie', 'baseball glove',
+  'baseball bat', 'tennis racket', 'skis', 'snowboard', 'surfboard', 'skateboard', 'wine glass', 'cup', 'fork', 'knife',
+  'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+])
+// big flat-looking classes need a sure answer, and a fridge must stand on the floor (its bottom low in the picture)
+const MIN_SCORE: Record<string, number> = { refrigerator: 0.75, bed: 0.6, couch: 0.55, 'dining table': 0.5, 'stop sign': 0.6, 'traffic light': 0.55 }
+type Pred = { class: string; score: number; bbox: number[] }
+export function keepPrediction(p: Pred, H: number): boolean {
+  if (IGNORE.has(p.class)) return false
+  if (p.score < (MIN_SCORE[p.class] ?? 0)) return false
+  if (p.class === 'refrigerator') {
+    const [, y, , h] = p.bbox
+    if (y + h < H * 0.8) return false // floats on the wall: a poster, cupboard or notice board, not a fridge
+  }
+  return true
+}
+
 const PEOPLE: Record<Lang, string> = { en: 'people', hi: 'लोग', pa: 'ਲੋਕ' }
 
 export type Seen = { name: string; pos: Position; close: boolean; metres: number | null } | null
@@ -103,7 +123,7 @@ export function useObstacles(
       if (!active || !video || !c) return
       if (video.readyState < 2 || !video.videoWidth) { timer = window.setTimeout(run, 300); return }
       try {
-        const preds = await detectObjects(video)
+        const preds = (await detectObjects(video)).filter((p) => keepPrediction(p, video.videoHeight))
         if (!active) return
         const ctx = c.getContext('2d')
         c.width = video.videoWidth
