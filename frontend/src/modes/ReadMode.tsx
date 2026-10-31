@@ -155,11 +155,7 @@ export default function ReadMode({ command, shared }: {
 
   const busy = reading || guiding
   return (
-    <div className="mode">
-      <Segmented label={t('readTitle')} value={tool} onChange={pick} items={[
-        { id: 'doc', label: t('toolDoc') }, { id: 'money', label: t('toolMoney') },
-        { id: 'note', label: t('toolNote') }, { id: 'ask', label: t('toolAsk') },
-      ]} />
+    <div className="mode camfirst">
       <CameraView cam={cam} chip={guiding ? t('scan') : undefined} overlay={
         reading ? (
           <div className="scan-overlay reading" aria-hidden="true">
@@ -172,42 +168,37 @@ export default function ReadMode({ command, shared }: {
             <div className="scan-msg"><b>{hint.arrow}</b> {hint.text}</div>
           </div>
         ) : null
-      } compact={!!result} />
+      } top={!reading && !guiding && <ResultCard src={result} onClose={() => setResult(null)} />} />
 
-      {tool === 'doc' && (
-        <>
-          <button type="button" className={`pill-btn ${guiding ? 'on' : ''}`} aria-pressed={guiding} onClick={guide} disabled={reading}>
-            <Icon name={guiding ? 'stop' : 'scan'} />{guiding ? t('stop') : t('scanDoc')}</button>
-          <div className="row three">
-            <button type="button" className="pill-btn light small" onClick={() => void snap()} disabled={busy}><Icon name="photo" size={20} />{t('quickPhoto')}</button>
-            <button type="button" className="pill-btn light small" onClick={() => fileInput.current?.click()} disabled={busy}><Icon name="upload" size={20} />{t('upload')}</button>
-            <button type="button" className="pill-btn light small" onClick={more}><Icon name="more" size={20} />{t('more2')}</button>
-          </div>
-        </>
-      )}
-      {tool === 'money' && (
-        <>
-          <button type="button" className="pill-btn" onClick={() => void moneyCheck('count')} disabled={busy}><Icon name="money" />{t('countBtn')}</button>
-          <button type="button" className="pill-btn light" onClick={() => void moneyCheck('change')} disabled={busy}>{t('changeBtn')}</button>
-          {!result && <p className="hint">{t('moneyHint')}</p>}
-        </>
-      )}
-      {tool === 'note' && (
-        <>
-          <button type="button" className="pill-btn" onClick={() => void moneyCheck('check')} disabled={busy}><Icon name="eye" />{t('noteBtn')}</button>
-          {!result && <p className="hint">{t('noteHint')}</p>}
-        </>
-      )}
-      {tool === 'ask' && (
-        <>
+      <Segmented label={t('readTitle')} value={tool} onChange={pick} items={[
+        { id: 'doc', label: t('toolDoc') }, { id: 'money', label: t('toolMoney') },
+        { id: 'note', label: t('toolNote') }, { id: 'ask', label: t('toolAsk') },
+      ]} />
+
+      <div className="action-row">
+        {tool === 'doc' && (
+          <>
+            <button type="button" className={`pill-btn ${guiding ? 'on' : ''}`} aria-pressed={guiding} onClick={guide} disabled={reading}>
+              <Icon name={guiding ? 'stop' : 'scan'} />{guiding ? t('stop') : t('scanDoc')}</button>
+            <button type="button" className="round big" onClick={() => void snap()} disabled={busy} aria-label={t('quickPhoto')}><Icon name="photo" /></button>
+            <button type="button" className="round big" onClick={() => fileInput.current?.click()} disabled={busy} aria-label={t('upload')}><Icon name="upload" /></button>
+            <button type="button" className="round big" onClick={more} aria-label={t('more2')}><Icon name="more" /></button>
+          </>
+        )}
+        {tool === 'money' && (
+          <>
+            <button type="button" className="pill-btn" onClick={() => void moneyCheck('count')} disabled={busy}>{t('countBtn')}</button>
+            <button type="button" className="pill-btn light" onClick={() => void moneyCheck('change')} disabled={busy}>{t('changeBtn')}</button>
+          </>
+        )}
+        {tool === 'note' && <button type="button" className="pill-btn" onClick={() => void moneyCheck('check')} disabled={busy}><Icon name="eye" />{t('noteBtn')}</button>}
+        {tool === 'ask' && (
           <form className="ask" onSubmit={(e) => { e.preventDefault(); void ask(question) }}>
             <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('askPlaceholder')} aria-label={t('askPlaceholder')} enterKeyHint="send" />
             <button type="submit" aria-label={t('ask')}><Icon name="send" /></button>
           </form>
-          {!result && <p className="hint">{t('askHint')}</p>}
-        </>
-      )}
-      <ResultCard src={result} />
+        )}
+      </div>
       <input ref={fileInput} type="file" accept="image/*,application/pdf" hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = '' }} />
     </div>

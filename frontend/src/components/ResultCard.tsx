@@ -1,20 +1,16 @@
 // The answer card: a gradient card with one big line. Warnings also say so in words (never colour alone).
-import { useEffect, useRef } from 'react'
 import type { ResultSrc } from '../core/result'
 import Icon from './Icon'
 import { t } from '../i18n/phrases'
 
 const ACCENT = { info: 'purple', success: 'green', warning: 'coral' } as const
 
-export default function ResultCard({ src }: { src: ResultSrc | null }) {
-  const ref = useRef<HTMLElement>(null)
-  // a new answer slides into view above the caption strip (the buttons stay where they were)
-  useEffect(() => { if (src) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [src])
+export default function ResultCard({ src, onClose }: { src: ResultSrc | null; onClose?: () => void }) {
   if (!src) return null
   const r = src.make() // built at render time, so switching language re-labels the card
   const accent = r.accent ?? ACCENT[r.tone]
   return (
-    <section ref={ref} className="result" aria-live="polite">
+    <section className="result" aria-live="polite">
       <div className={`hero g-${accent}`}>
         <div className="hero-top">
           <span className="hero-label">
@@ -23,6 +19,7 @@ export default function ResultCard({ src }: { src: ResultSrc | null }) {
             {r.label}
           </span>
           {r.swatch && <span className={`swatch swatch-${r.swatch}`} aria-hidden="true" />}
+          {onClose && <button type="button" className="hero-close" onClick={onClose} aria-label={t('close')}><Icon name="x" size={20} /></button>}
         </div>
         <p className="hero-headline">{r.headline}</p>
         {r.detail && <p className={r.compare ? 'sr-only' : 'hero-detail'}>{r.detail}</p>}

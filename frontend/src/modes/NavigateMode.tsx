@@ -140,79 +140,68 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
   const progress = route.status === 'arrived' ? 1 : total.current && route.remaining != null ? 1 - route.remaining / total.current : 0
   const hazardTitle = hazard ? (hazard.speech.includes(',') ? hazard.speech.slice(0, hazard.speech.lastIndexOf(',')) : hazard.speech) : ''
 
+  const routeCard = showRoute && (
+    <section className={`hero g-${route.status === 'error' ? 'coral' : route.status === 'arrived' ? 'green' : 'blue'} route route-${route.status}`} aria-live="polite">
+      <div className="hero-top">
+        <span className="hero-label">{route.status === 'arrived' ? t('arrived') : route.place ? t('routeTo', { p: route.place }) : t('nextTurn')}</span>
+        {route.status === 'active' && route.remaining != null && <span className="hero-tag">{t('toGo', { d: sayDist(route.remaining) })}</span>}
+        <button type="button" className="hero-end" onClick={endRoute}>{t('endRoute')}</button>
+      </div>
+      <button type="button" className="route-main" onClick={repeatStep}>
+        <span className="route-icon"><Icon name={route.status === 'active' || route.status === 'arrived' ? TURN_ICON[route.arrow ?? ''] ?? 'straight' : 'pin'} size={30} /></span>
+        <span className="route-text">
+          <b>{route.status === 'locating' ? t('locating') : route.status === 'searching' ? t('searchingPlace')
+            : route.status === 'error' ? route.error : route.instruction}</b>
+          {route.status === 'active' && route.toNext != null && <small>{t('nextIn', { d: sayDist(route.toNext) })}</small>}
+        </span>
+      </button>
+      {(route.status === 'active' || route.status === 'arrived') &&
+        <Dots rows={2} className="progress" values={Array.from({ length: 30 }, (_, i) => (i < Math.round(progress * 30) ? 2 : 0))} />}
+    </section>
+  )
+  const hazardCard = hazard && set.hazards && !finding && (
+    <section className={`hero g-coral hazard ${hazard.urgent ? 'urgent' : ''}`} aria-hidden="true">
+      <span className="hero-label"><Icon name="warn" size={18} />{t('hazardAhead')}</span>
+      <div className="hazard-row">
+        <p className="hero-headline">{hazardTitle}</p>
+        <span className="big-num">{hazard.metres} m</span>
+      </div>
+      <Dots rows={4} values={closeness(1 - hazard.metres / 7, 30, 4)} />
+    </section>
+  )
+
   return (
-    <div className="mode">
+    <div className="mode camfirst">
+      <CameraView cam={cam} canvasRef={canvasRef} chip={chip} chipTone={chipTone}
+        top={<>{routeCard}<ResultCard src={result} onClose={() => setResult(null)} /></>}
+        bottom={hazardCard} />
+
       <Segmented label={t('navTitle')} value={tool} onChange={pick} items={[
         { id: 'ahead', label: t('toolAhead') }, { id: 'sign', label: t('toolSign') },
         { id: 'bin', label: t('toolBin') }, { id: 'route', label: t('toolRoute') },
       ]} />
 
-      {showRoute && (
-        <section className={`hero g-${route.status === 'error' ? 'coral' : route.status === 'arrived' ? 'green' : 'blue'} route route-${route.status}`} aria-live="polite">
-          <div className="hero-top">
-            <span className="hero-label">{route.status === 'arrived' ? t('arrived') : t('nextTurn')}</span>
-            {route.status === 'active' && route.remaining != null && <span className="hero-tag">{t('toGo', { d: sayDist(route.remaining) })}</span>}
-            <button type="button" className="hero-end" onClick={endRoute}>{t('endRoute')}</button>
-          </div>
-          <button type="button" className="route-main" onClick={repeatStep}>
-            <span className="route-icon"><Icon name={route.status === 'active' || route.status === 'arrived' ? TURN_ICON[route.arrow ?? ''] ?? 'straight' : 'pin'} size={34} /></span>
-            <span className="route-text">
-              <b>{route.status === 'locating' ? t('locating') : route.status === 'searching' ? t('searchingPlace')
-                : route.status === 'error' ? route.error : route.instruction}</b>
-              {route.status === 'active' && route.toNext != null && <small>{t('nextIn', { d: sayDist(route.toNext) })}</small>}
-            </span>
-          </button>
-          {route.place && <span className="hero-label faint">{t('routeTo', { p: route.place })}</span>}
-          {(route.status === 'active' || route.status === 'arrived') &&
-            <Dots rows={2} className="progress" values={Array.from({ length: 30 }, (_, i) => (i < Math.round(progress * 30) ? 2 : 0))} />}
-        </section>
-      )}
-
-      <CameraView cam={cam} canvasRef={canvasRef} chip={chip} chipTone={chipTone} compact={showRoute || !!result || (!!hazard && set.hazards)} />
-
-      {hazard && set.hazards && !finding && (
-        <section className={`hero g-coral hazard ${hazard.urgent ? 'urgent' : ''}`} aria-hidden="true">
-          <div className="hero-top"><span className="hero-label"><Icon name="warn" size={18} />{t('hazardAhead')}</span></div>
-          <p className="hero-headline">{hazardTitle}</p>
-          <div className="hazard-row">
-            <span className="big-num">{hazard.metres} m</span>
-            <Dots rows={7} values={closeness(1 - hazard.metres / 7)} />
-          </div>
-        </section>
-      )}
-
-      {tool === 'ahead' && (
-        <button type="button" className="pill-btn" onClick={() => void ahead()}><Icon name="eye" />{t('descAhead')}</button>
-      )}
-      {tool === 'sign' && (
-        <button type="button" className="pill-btn" onClick={() => void sign()}><Icon name="sign" />{t('readSignBtn')}</button>
-      )}
-      {tool === 'bin' && (
-        <>
-          <button type="button" className="pill-btn" onClick={() => void whatBin()}><Icon name="bin" />{t('whichBinBtn')}</button>
-          <button type="button" className={`pill-btn light ${finding ? 'on' : ''}`} aria-pressed={finding} onClick={findBin} disabled={!bin && !finding}>
-            {finding ? t('stopFinding') : bin ? t('findBinBtn', { c: t(bin) }) : t('findBin')}
-          </button>
-          {!result && <p className="hint">{t('binHint')}</p>}
-        </>
-      )}
-      {tool === 'route' && (routing ? (
-        <div className="row">
-          <button type="button" className="pill-btn grow" onClick={repeatStep}><Icon name="repeat" />{t('repeatTurn')}</button>
-          <button type="button" className="round big" onClick={() => void locate()} aria-label={t('whereAmI')}><Icon name="pin" /></button>
-        </div>
-      ) : (
-        <>
+      <div className="action-row">
+        {tool === 'ahead' && <button type="button" className="pill-btn" onClick={() => void ahead()}><Icon name="eye" />{t('descAhead')}</button>}
+        {tool === 'sign' && <button type="button" className="pill-btn" onClick={() => void sign()}><Icon name="sign" />{t('readSignBtn')}</button>}
+        {tool === 'bin' && (
+          <>
+            <button type="button" className="pill-btn" onClick={() => void whatBin()}><Icon name="bin" />{t('whichBinBtn')}</button>
+            <button type="button" className={`round big ${finding ? 'danger' : ''}`} aria-pressed={finding} onClick={findBin} disabled={!bin && !finding}
+              aria-label={finding ? t('stopFinding') : bin ? t('findBinBtn', { c: t(bin) }) : t('findBin')}>
+              <Icon name={finding ? 'stop' : 'nav'} /></button>
+          </>
+        )}
+        {tool === 'route' && (routing ? (
+          <button type="button" className="pill-btn" onClick={repeatStep}><Icon name="repeat" />{t('repeatTurn')}</button>
+        ) : (
           <form className="ask" onSubmit={(e) => { e.preventDefault(); go(dest) }}>
             <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder={t('whereTo')} aria-label={t('whereTo')} enterKeyHint="go" />
             <button type="submit" aria-label={t('go')}><Icon name="send" /></button>
           </form>
-          <button type="button" className="pill-btn light" onClick={() => void locate()}><Icon name="pin" />{t('whereAmI')}</button>
-          {!result && <p className="hint">{t('routeHint')}</p>}
-        </>
-      ))}
-
-      <ResultCard src={result} />
+        ))}
+        {tool === 'route' && <button type="button" className="round big" onClick={() => void locate()} aria-label={t('whereAmI')}><Icon name="pin" /></button>}
+      </div>
     </div>
   )
 }
