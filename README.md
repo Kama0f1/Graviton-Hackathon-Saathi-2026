@@ -1,5 +1,7 @@
 # Saathi — GRAVITON 2026
 
+> Full project context (features, API contract, frontend plan): [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md)
+
 An installable web app (PWA) that helps blind and low-vision users **navigate**, **sort waste**, and **read documents and bills** using only the phone camera, voice and vibration.
 
 Submitted under **PS #13 (NaviAble)**, extended with #18 (documents), #22 (waste) and #25 (bills).

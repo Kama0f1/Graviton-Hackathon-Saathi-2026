@@ -1,0 +1,157 @@
+"""Fixed sentences the backend speaks itself, in English, Hindi and Punjabi.
+Anything that must be exactly right comes from here, not from the AI."""
+from .prompts import lang_code
+
+P = {
+    "en": {
+        "bin_green": "Green bin", "bin_blue": "Blue bin", "bin_red": "Red bin",
+        "bin_none": "I'm not sure which bin.",
+        "cat_wet": "Wet waste", "cat_dry": "Dry waste", "cat_hazardous": "Hazardous waste",
+        "rupees": "rupees",
+        "bill_head": "{shop}. {n} items. Total {total}.",
+        "bill_head_noshop": "Bill with {n} items. Total {total}.",
+        "bill_head_nototal": "{shop}. {n} items. No total is printed. The items add up to {sum}.",
+        "mismatch": "Warning: the items add up to {sum}, but the total says {total}.",
+        "multiple_bills": "There is more than one bill in the photo. Reading the clearest one.",
+        "item_code": "Item {code}",
+        "retake": "Some numbers are unclear. Please take the photo again.",
+        "no_doc": "Please read a document first.",
+        "money_total": "Total {total}.",
+        "money_paying": "You are paying {paid}. The bill is {bill}. You should get {expected} back.",
+        "money_exact": "That is exactly the bill amount. No change is due.",
+        "money_not_enough": "That is {short} less than the bill of {bill}.",
+        "change_ok": "Correct change: you got {got}.",
+        "change_short": "You should get {expected}, but you got {got}. {diff} short.",
+        "change_extra": "You should get {expected}, but you got {got}. {diff} extra.",
+        "need_bill": "Read the bill first, then check the change.",
+        "need_paid": "Count the money you are paying first.",
+        "money_unclear": "Some notes are unclear or overlapping. Spread them out and take the photo again.",
+        "money_none": "I can't see any money in the photo.",
+        "note": "note", "notes": "notes", "coin": "coin", "coins": "coins",
+        "fake_one": "Warning: the {value} rupee note may be fake: {reason}. Do not accept it.",
+        "no_obvious_fake": "No obvious signs of a fake on {n} {notes}. I can only catch obvious fakes, so check large amounts with a bank.",
+        "reason_not_rbi": "it does not say Reserve Bank of India",
+        "reason_toy_text": "it has toy or film-prop text on it",
+        "reason_photocopy": "it looks like a photocopy or printout",
+        "reason_mismatch": "its colour or design does not match a real note of that value",
+        "reason_other": "something looks wrong on it",
+        "move_left": "Move phone left.", "move_right": "Move phone right.",
+        "move_up": "Move phone up.", "move_down": "Move phone down.",
+        "move_closer": "Move closer.", "move_back": "Move back a little.",
+        "move_hold": "Hold still.", "move_light": "Too dark. Find more light.", "move_none": "",
+    },
+    "hi": {
+        "bin_green": "हरा डिब्बा", "bin_blue": "नीला डिब्बा", "bin_red": "लाल डिब्बा",
+        "bin_none": "पक्का नहीं पता कौन सा डिब्बा।",
+        "cat_wet": "गीला कचरा", "cat_dry": "सूखा कचरा", "cat_hazardous": "खतरनाक कचरा",
+        "rupees": "रुपये",
+        "bill_head": "{shop}। {n} सामान। कुल {total}।",
+        "bill_head_noshop": "बिल में {n} सामान। कुल {total}।",
+        "bill_head_nototal": "{shop}। {n} सामान। कुल राशि लिखी नहीं है। सामान का जोड़ {sum} है।",
+        "mismatch": "ध्यान दें: सामान का जोड़ {sum} है, लेकिन बिल पर कुल {total} लिखा है।",
+        "multiple_bills": "फ़ोटो में एक से ज़्यादा बिल हैं। सबसे साफ़ वाला पढ़ रहा हूँ।",
+        "item_code": "आइटम {code}",
+        "retake": "कुछ अंक साफ़ नहीं हैं। कृपया फ़ोटो दोबारा लें।",
+        "no_doc": "पहले कोई दस्तावेज़ पढ़ें।",
+        "money_total": "कुल {total}।",
+        "money_paying": "आप {paid} दे रहे हैं। बिल {bill} का है। आपको {expected} वापस मिलने चाहिए।",
+        "money_exact": "यह बिल के बराबर है। कोई छुट्टा नहीं बनता।",
+        "money_not_enough": "यह बिल {bill} से {short} कम है।",
+        "change_ok": "छुट्टा सही है: आपको {got} मिले।",
+        "change_short": "आपको {expected} मिलने चाहिए, पर {got} मिले। {diff} कम हैं।",
+        "change_extra": "आपको {expected} मिलने चाहिए, पर {got} मिले। {diff} ज़्यादा हैं।",
+        "need_bill": "पहले बिल पढ़ें, फिर छुट्टा जाँचें।",
+        "need_paid": "पहले वो पैसे गिनें जो आप दे रहे हैं।",
+        "money_unclear": "कुछ नोट साफ़ नहीं हैं या एक-दूसरे पर हैं। उन्हें फैलाकर फ़ोटो दोबारा लें।",
+        "money_none": "फ़ोटो में कोई पैसे नहीं दिख रहे।",
+        "note": "नोट", "notes": "नोट", "coin": "सिक्का", "coins": "सिक्के",
+        "fake_one": "सावधान: {value} रुपये का नोट नकली हो सकता है: {reason}। इसे न लें।",
+        "no_obvious_fake": "{n} {notes} में नकली होने के कोई साफ़ निशान नहीं दिखे। मैं सिर्फ़ साफ़ दिखने वाले नकली नोट पकड़ सकता हूँ, बड़ी रकम बैंक से जाँचवाएँ।",
+        "reason_not_rbi": "इस पर रिज़र्व बैंक ऑफ़ इंडिया नहीं लिखा है",
+        "reason_toy_text": "इस पर खिलौने या फ़िल्म वाले नोट का लिखा है",
+        "reason_photocopy": "यह फ़ोटोकॉपी या प्रिंटआउट जैसा लगता है",
+        "reason_mismatch": "इसका रंग या डिज़ाइन असली नोट से मेल नहीं खाता",
+        "reason_other": "इसमें कुछ गड़बड़ लगती है",
+        "move_left": "फ़ोन बाईं ओर ले जाएँ।", "move_right": "फ़ोन दाईं ओर ले जाएँ।",
+        "move_up": "फ़ोन ऊपर करें।", "move_down": "फ़ोन नीचे करें।",
+        "move_closer": "पास लाएँ।", "move_back": "थोड़ा पीछे करें।",
+        "move_hold": "स्थिर रखें।", "move_light": "रोशनी कम है।", "move_none": "",
+    },
+    "pa": {
+        "bin_green": "ਹਰਾ ਡੱਬਾ", "bin_blue": "ਨੀਲਾ ਡੱਬਾ", "bin_red": "ਲਾਲ ਡੱਬਾ",
+        "bin_none": "ਪੱਕਾ ਨਹੀਂ ਪਤਾ ਕਿਹੜਾ ਡੱਬਾ।",
+        "cat_wet": "ਗਿੱਲਾ ਕੂੜਾ", "cat_dry": "ਸੁੱਕਾ ਕੂੜਾ", "cat_hazardous": "ਖ਼ਤਰਨਾਕ ਕੂੜਾ",
+        "rupees": "ਰੁਪਏ",
+        "bill_head": "{shop}। {n} ਚੀਜ਼ਾਂ। ਕੁੱਲ {total}।",
+        "bill_head_noshop": "ਬਿੱਲ ਵਿੱਚ {n} ਚੀਜ਼ਾਂ। ਕੁੱਲ {total}।",
+        "bill_head_nototal": "{shop}। {n} ਚੀਜ਼ਾਂ। ਕੁੱਲ ਰਕਮ ਲਿਖੀ ਨਹੀਂ ਹੈ। ਸਮਾਨ ਦਾ ਜੋੜ {sum} ਹੈ।",
+        "mismatch": "ਧਿਆਨ ਦਿਓ: ਸਮਾਨ ਦਾ ਜੋੜ {sum} ਹੈ, ਪਰ ਬਿੱਲ ਤੇ ਕੁੱਲ {total} ਲਿਖਿਆ ਹੈ।",
+        "multiple_bills": "ਫ਼ੋਟੋ ਵਿੱਚ ਇੱਕ ਤੋਂ ਵੱਧ ਬਿੱਲ ਹਨ। ਸਭ ਤੋਂ ਸਾਫ਼ ਵਾਲਾ ਪੜ੍ਹ ਰਿਹਾ ਹਾਂ।",
+        "item_code": "ਆਈਟਮ {code}",
+        "retake": "ਕੁਝ ਅੰਕ ਸਾਫ਼ ਨਹੀਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਫ਼ੋਟੋ ਦੁਬਾਰਾ ਲਓ।",
+        "no_doc": "ਪਹਿਲਾਂ ਕੋਈ ਦਸਤਾਵੇਜ਼ ਪੜ੍ਹੋ।",
+        "money_total": "ਕੁੱਲ {total}।",
+        "money_paying": "ਤੁਸੀਂ {paid} ਦੇ ਰਹੇ ਹੋ। ਬਿੱਲ {bill} ਦਾ ਹੈ। ਤੁਹਾਨੂੰ {expected} ਵਾਪਸ ਮਿਲਣੇ ਚਾਹੀਦੇ ਹਨ।",
+        "money_exact": "ਇਹ ਬਿੱਲ ਦੇ ਬਰਾਬਰ ਹੈ। ਕੋਈ ਭਾਨ ਨਹੀਂ ਬਣਦੀ।",
+        "money_not_enough": "ਇਹ ਬਿੱਲ {bill} ਤੋਂ {short} ਘੱਟ ਹੈ।",
+        "change_ok": "ਭਾਨ ਸਹੀ ਹੈ: ਤੁਹਾਨੂੰ {got} ਮਿਲੇ।",
+        "change_short": "ਤੁਹਾਨੂੰ {expected} ਮਿਲਣੇ ਚਾਹੀਦੇ ਸਨ, ਪਰ {got} ਮਿਲੇ। {diff} ਘੱਟ ਹਨ।",
+        "change_extra": "ਤੁਹਾਨੂੰ {expected} ਮਿਲਣੇ ਚਾਹੀਦੇ ਸਨ, ਪਰ {got} ਮਿਲੇ। {diff} ਵੱਧ ਹਨ।",
+        "need_bill": "ਪਹਿਲਾਂ ਬਿੱਲ ਪੜ੍ਹੋ, ਫਿਰ ਭਾਨ ਜਾਂਚੋ।",
+        "need_paid": "ਪਹਿਲਾਂ ਉਹ ਪੈਸੇ ਗਿਣੋ ਜੋ ਤੁਸੀਂ ਦੇ ਰਹੇ ਹੋ।",
+        "money_unclear": "ਕੁਝ ਨੋਟ ਸਾਫ਼ ਨਹੀਂ ਹਨ ਜਾਂ ਇੱਕ-ਦੂਜੇ ਉੱਤੇ ਹਨ। ਉਹਨਾਂ ਨੂੰ ਖਿਲਾਰ ਕੇ ਫ਼ੋਟੋ ਦੁਬਾਰਾ ਲਓ।",
+        "money_none": "ਫ਼ੋਟੋ ਵਿੱਚ ਕੋਈ ਪੈਸੇ ਨਹੀਂ ਦਿਸ ਰਹੇ।",
+        "note": "ਨੋਟ", "notes": "ਨੋਟ", "coin": "ਸਿੱਕਾ", "coins": "ਸਿੱਕੇ",
+        "fake_one": "ਸਾਵਧਾਨ: {value} ਰੁਪਏ ਦਾ ਨੋਟ ਨਕਲੀ ਹੋ ਸਕਦਾ ਹੈ: {reason}। ਇਸਨੂੰ ਨਾ ਲਓ।",
+        "no_obvious_fake": "{n} {notes} ਵਿੱਚ ਨਕਲੀ ਹੋਣ ਦੇ ਕੋਈ ਸਾਫ਼ ਨਿਸ਼ਾਨ ਨਹੀਂ ਦਿਸੇ। ਮੈਂ ਸਿਰਫ਼ ਸਾਫ਼ ਦਿਸਣ ਵਾਲੇ ਨਕਲੀ ਨੋਟ ਫੜ ਸਕਦਾ ਹਾਂ, ਵੱਡੀ ਰਕਮ ਬੈਂਕ ਤੋਂ ਜਾਂਚ ਕਰਵਾਓ।",
+        "reason_not_rbi": "ਇਸ ਉੱਤੇ ਰਿਜ਼ਰਵ ਬੈਂਕ ਆਫ਼ ਇੰਡੀਆ ਨਹੀਂ ਲਿਖਿਆ",
+        "reason_toy_text": "ਇਸ ਉੱਤੇ ਖਿਡੌਣੇ ਜਾਂ ਫ਼ਿਲਮ ਵਾਲੇ ਨੋਟ ਦਾ ਲਿਖਿਆ ਹੈ",
+        "reason_photocopy": "ਇਹ ਫ਼ੋਟੋਕਾਪੀ ਜਾਂ ਪ੍ਰਿੰਟਆਊਟ ਵਰਗਾ ਲੱਗਦਾ ਹੈ",
+        "reason_mismatch": "ਇਸਦਾ ਰੰਗ ਜਾਂ ਡਿਜ਼ਾਈਨ ਅਸਲੀ ਨੋਟ ਨਾਲ ਨਹੀਂ ਮਿਲਦਾ",
+        "reason_other": "ਇਸ ਵਿੱਚ ਕੁਝ ਗੜਬੜ ਲੱਗਦੀ ਹੈ",
+        "move_left": "ਫ਼ੋਨ ਖੱਬੇ ਪਾਸੇ ਕਰੋ।", "move_right": "ਫ਼ੋਨ ਸੱਜੇ ਪਾਸੇ ਕਰੋ।",
+        "move_up": "ਫ਼ੋਨ ਉੱਪਰ ਕਰੋ।", "move_down": "ਫ਼ੋਨ ਹੇਠਾਂ ਕਰੋ।",
+        "move_closer": "ਨੇੜੇ ਲਿਆਓ।", "move_back": "ਥੋੜ੍ਹਾ ਪਿੱਛੇ ਕਰੋ।",
+        "move_hold": "ਸਥਿਰ ਰੱਖੋ।", "move_light": "ਰੋਸ਼ਨੀ ਘੱਟ ਹੈ।", "move_none": "",
+    },
+}
+
+
+def t(key: str, lang: str = "en", **values) -> str:
+    """t("mismatch", "hi", sum="4,350", total="4,830") -> the Hindi warning."""
+    text = P[lang_code(lang)].get(key) or P["en"][key]
+    return text.format(**values) if values else text
+
+
+def money(x: float) -> str:
+    """4350.0 -> "4,350"; 12.5 -> "12.50"."""
+    return f"{x:,.0f}" if float(x).is_integer() else f"{x:,.2f}"
+
+
+def qty(x: float) -> str:
+    return str(int(x)) if float(x).is_integer() else f"{x:g}"
+
+
+# currency code -> (main unit, sub unit) per language
+CURRENCY = {
+    "INR": {"en": ("rupees", "paise"), "hi": ("रुपये", "पैसे"), "pa": ("ਰੁਪਏ", "ਪੈਸੇ")},
+    "EUR": {"en": ("euros", "cents"), "hi": ("यूरो", "सेंट"), "pa": ("ਯੂਰੋ", "ਸੈਂਟ")},
+    "USD": {"en": ("dollars", "cents"), "hi": ("डॉलर", "सेंट"), "pa": ("ਡਾਲਰ", "ਸੈਂਟ")},
+    "GBP": {"en": ("pounds", "pence"), "hi": ("पाउंड", "पेंस"), "pa": ("ਪੌਂਡ", "ਪੈਂਸ")},
+}
+
+
+def say_money(x: float, currency: str = "INR", lang: str = "en") -> str:
+    """23.9 EUR en -> "23 euros 90 cents"; 4350 INR hi -> "4,350 रुपये". Written for speech, not screens."""
+    value = round(float(x), 2)
+    sign = "minus " if value < 0 else ""
+    value = abs(value)
+    main = int(value)
+    sub = int(round((value - main) * 100))
+    if sub == 100:
+        main, sub = main + 1, 0
+    names = CURRENCY.get((currency or "INR").strip().upper())
+    if names is None:  # unknown currency: number + code
+        return f"{sign}{money(value)} {(currency or '').upper()}".strip()
+    big, small = names[lang_code(lang)]
+    return f"{sign}{main:,} {big}" + (f" {sub} {small}" if sub else "")

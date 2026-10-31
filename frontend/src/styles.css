@@ -1,3 +1,121 @@
-/* High contrast, huge touch targets. Two halves fill the screen. */
-html, body, #root { height: 100%; margin: 0; background: #000; color: #fff; font-family: system-ui, sans-serif; }
-.app { height: 100%; display: grid; grid-template-rows: 1fr 1fr; }
+/* Dark navy, one amber accent. Status colours only for status. Every pair checked >= 6.5:1. */
+:root {
+  --bg: #0b0f14;
+  --surface: #151b24;
+  --border: #2a3340;
+  --text: #f4f6f8;
+  --muted: #a7b0be;
+  --accent: #ffb020;
+  --on-accent: #0b0f14;
+  --safe: #4ade80;
+  --alert: #ff6b5e;
+  --alert-bg: #b3261e;
+  --info: #7cc4ff;
+  --radius: 24px;
+  --font: 'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(--text); }
+body { font-family: var(--font); font-weight: 600; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+p { margin: 0; }
+
+.app {
+  height: 100dvh; display: grid; grid-template-rows: 1fr auto 1fr; gap: 16px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+/* ---------- halves ---------- */
+.half {
+  all: unset; box-sizing: border-box; cursor: pointer; position: relative; overflow: hidden;
+  display: flex; min-height: 0; padding: 20px; border-radius: var(--radius);
+  border: 2px solid var(--border); background: transparent; color: var(--muted);
+}
+.half.active { background: var(--surface); border: 4px solid var(--accent); color: var(--text); }
+.half:focus-visible { outline: 4px solid var(--accent); outline-offset: 4px; }
+
+.cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.35; }
+.half.active::after { /* dark overlay above the camera */
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(11, 15, 20, 0.35), rgba(11, 15, 20, 0.7));
+}
+.half-body {
+  position: relative; z-index: 1; flex: 1; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center;
+}
+.half-head { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.half-icon { color: var(--muted); }
+.half.active .half-icon { color: var(--accent); }
+.half-title { font-size: 44px; font-weight: 800; line-height: 1.05; }
+.half-hint { font-size: 22px; font-weight: 600; color: var(--muted); }
+.half.active .half-hint { color: var(--text); }
+
+/* the half showing a result gets more room; the other half stays a big target */
+.app.result-top { grid-template-rows: 1.4fr auto 1fr; }
+.app.result-bottom { grid-template-rows: 1fr auto 1.4fr; }
+
+/* with a result: mode becomes a small header row, result fills the card */
+.half.has-result .half-body { justify-content: flex-start; align-items: stretch; text-align: left; }
+.half.has-result .half-head { flex-direction: row; gap: 10px; }
+.half.has-result .half-title { font-size: 26px; }
+
+/* ---------- chips ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  font-size: 16px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1;
+  background: var(--bg); color: var(--muted); border: 2px solid var(--border);
+}
+.chip-active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.half.has-result .chip-active { margin-left: auto; }
+
+/* ---------- caption bar ---------- */
+.caption {
+  min-height: 132px; padding: 14px 18px; border-radius: var(--radius); background: var(--surface);
+  display: flex; flex-direction: column; gap: 10px; border: 2px solid var(--border);
+}
+.status { align-self: flex-start; }
+.status.ready { color: var(--muted); }
+.status.thinking { color: var(--muted); }
+.status.speaking { color: var(--accent); border-color: var(--accent); }
+.status.listening { color: var(--info); border-color: var(--info); }
+.status.offline { color: var(--alert); border-color: var(--alert); }
+.caption-text {
+  font-size: 28px; font-weight: 700; line-height: 1.25; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.caption-text.done { color: var(--muted); }
+.caption-icon { vertical-align: -5px; margin-right: 8px; }
+
+.caption.alert { background: var(--alert-bg); border-color: var(--alert-bg); animation: pulse 1.2s ease-in-out infinite; }
+.caption.alert .caption-text { color: #fff; font-weight: 800; }
+.caption.alert .status { color: #fff; background: transparent; border-color: #fff; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(179, 38, 30, 0.45); } }
+
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- result cards ---------- */
+.result {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center; gap: 10px;
+  padding: 16px 18px; border-radius: 18px; background: var(--surface); border: 2px solid var(--border); color: var(--text);
+}
+.result-headline {
+  font-size: 40px; font-weight: 800; line-height: 1.12;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.result-detail {
+  font-size: 22px; font-weight: 600; color: var(--muted); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.result-chips { display: flex; gap: 8px; overflow: hidden; flex: none; }
+.result-chips .chip { white-space: nowrap; }
+.result.warning { background: var(--alert-bg); border-color: var(--alert-bg); color: #fff; }
+.result.warning .result-detail { color: #fff; }
+.result.warning .chip { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.7); }
+.result.success { border-left: 8px solid var(--safe); }
+.result-icon { vertical-align: -4px; margin-right: 10px; }
+.result.success .result-icon { color: var(--safe); }
+
+@media (prefers-reduced-motion: reduce) {
+  .caption.alert, .spin { animation: none; }
+}

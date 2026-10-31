@@ -1,19 +1,37 @@
-# Camera framing guidance for Read mode. Must be FAST (~1.5 s). DUMMY for now.
+"""Camera framing for Read mode. Must be FAST: small image, Lite model, fixed phrases."""
 from fastapi import APIRouter, File, Form, UploadFile
 
-from ..schemas import GuidanceResult
+from ..config import GEMINI_GUIDANCE_MODEL
+from ..schemas import AIGuidance, GuidanceResult
+from ..services import gemini, groq, media, prompts
+from ..services.errors import AIError
+from ..services.phrases import t
 
 router = APIRouter(tags=["guidance"])
 
-PHRASES = {
-    "left": "Move phone left.", "right": "Move phone right.", "up": "Move phone up.",
-    "down": "Move phone down.", "closer": "Move closer.", "back": "Move back.",
-    "hold": "Hold still.", "light": "Too dark. Find more light.", "none": "",
-}
-
 
 @router.post("/guidance", response_model=GuidanceResult)
-async def guidance(image: UploadFile = File(...), target: str = Form("document"),
-                   lang: str = Form("en"), session_id: str = Form("")):
-    # TODO: cheap Gemini call returns {ready, move}; speech comes from PHRASES, not the model
-    return GuidanceResult(ready=False, move="left", speech=PHRASES["left"])
+async def guidance(
+    image: UploadFile = File(...),
+    target: str = Form("document"),
+    lang: str = Form("en"),
+    session_id: str = Form(""),
+):
+    target = "bill" if target == "bill" else "document"
+    data, mime = await media.read_upload(image, max_side=768)
+    try:
+        ai = await gemini.ask(
+            prompts.load("guidance", lang, target=target), AIGuidance,
+            [(data, mime)], model=GEMINI_GUIDANCE_MODEL, timeout=6, fallback=False,  # a backup call would be too slow for live framing
+        )
+    except AIError as exc:
+        if "too long" in str(exc):
+            # a slow frame is not an error: say nothing, the phone just sends the next frame
+            return GuidanceResult(ready=False, move="none", speech="")
+        if "rate limit" in str(exc) and groq.available([(data, mime)]):
+            # free-tier limit: this error comes back instantly, so the backup still answers in time
+            ai = await groq.ask(prompts.load("guidance", lang, target=target), AIGuidance, [(data, mime)], timeout=5)
+        else:
+            raise
+    move = "hold" if ai.ready else ai.move
+    return GuidanceResult(ready=ai.ready, move=move, speech=t("move_" + move, lang))

@@ -22,3 +22,12 @@ Thumbs.db
 
 # demo media (large)
 demo/*.mp4
+
+# live test output
+backend/tests/live_results.json
+# your own / stock test photos (may be copyrighted): keep local
+backend/tests/samples/real/*
+!backend/tests/samples/real/.gitkeep
+
+# scratch screenshots from design/AI tools
+Claude outputs/

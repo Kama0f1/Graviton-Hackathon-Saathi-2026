@@ -38,6 +38,7 @@ class BillItem(BaseModel):
 
 class Bill(BaseModel):
     shop: Optional[str] = None
+    currency: str = "INR"
     items: list[BillItem] = Field(default_factory=list)
     printed_total: Optional[float] = None
     computed_total: Optional[float] = None
@@ -52,6 +53,31 @@ class ReadResult(BaseModel):
     key_fields: dict = Field(default_factory=dict)
     bill: Optional[Bill] = None
     uncertain: list[str] = Field(default_factory=list)
+
+
+class MoneyItem(BaseModel):
+    value: float
+    kind: Literal["note", "coin"]
+    count: int
+
+
+class SuspectNote(BaseModel):
+    value: float
+    reason: Literal["not_rbi", "toy_text", "photocopy", "mismatch", "other"]
+
+
+class MoneyResult(BaseModel):
+    mode: Literal["count", "change", "check"]
+    speech: str
+    currency: str = "INR"
+    total: float = 0                          # money counted in this photo
+    items: list[MoneyItem] = Field(default_factory=list)
+    bill_total: Optional[float] = None        # from the last /read bill in this session
+    paid: Optional[float] = None              # what the user handed over
+    expected_change: Optional[float] = None   # paid - bill_total
+    difference: Optional[float] = None        # change got - expected (negative = short)
+    suspicious: list[SuspectNote] = Field(default_factory=list)  # notes with OBVIOUS fake signs
+    unclear: bool = False
 
 
 class ErrorResult(BaseModel):

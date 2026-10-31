@@ -1,8 +1,9 @@
 fastapi
 uvicorn[standard]
 python-multipart
-pydantic
+pydantic>=2
 python-dotenv
 google-genai
-pymupdf
 httpx
+pillow
+pytest

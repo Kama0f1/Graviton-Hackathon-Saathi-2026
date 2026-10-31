@@ -1,11 +1,16 @@
-# Text-to-speech proxy (Sarvam) for hi / pa voices. Frontend falls back to Web Speech.
+"""Text-to-speech via Sarvam (Hindi / Punjabi / Indian English). Returns audio/wav."""
 from fastapi import APIRouter, Form
 from fastapi.responses import Response
+
+from ..services import sarvam
+from ..services.errors import BadInput
 
 router = APIRouter(tags=["tts"])
 
 
-@router.post("/tts")
+@router.post("/tts", response_class=Response, responses={200: {"content": {"audio/wav": {}}}})
 async def tts(text: str = Form(...), lang: str = Form("en")):
-    # TODO: services.sarvam.speak(text, lang) -> audio bytes
-    return Response(status_code=501, content=b"not implemented")
+    if not text.strip():
+        raise BadInput("No text to speak")
+    audio = await sarvam.speak(text.strip(), lang)
+    return Response(content=audio, media_type="audio/wav")

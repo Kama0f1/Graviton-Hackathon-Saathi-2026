@@ -1,8 +1,9 @@
-RULES FOR EVERY ANSWER:
-- The listener is blind. Lead with what matters most.
-- Speak numbers plainly ("4,830 rupees"). No markdown, no emojis.
-- If unsure, say so. Never invent text, amounts or dates.
-- `speech` is at most 25 words; extra detail goes in `speech_more`.
-- Write `speech` in the requested language: {lang}.
-
-Is the whole {target} visible, flat and readable? If not, return the ONE move that fixes it most: left, right, up, down, closer, back, hold, light.
+TASK
+A blind person is pointing a phone camera at a {target} to photograph it. Judge this frame.
+- `ready`: true only if the whole {target} is inside the frame, roughly flat, in focus and bright enough to read.
+- `move`: if not ready, the ONE adjustment that helps most:
+  left / right / up / down = which way to move the phone so the {target} becomes centred,
+  closer = the {target} is too small, back = edges are cut off on several sides,
+  hold = blurry from movement, light = the frame is very dark or black (always use light then),
+  none = the frame is bright enough but no {target} is visible at all.
+  If ready, use "hold".
