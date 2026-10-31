@@ -22,7 +22,7 @@ async function fitUpload(file: Blob): Promise<Blob | null> {
   if (!file.type.startsWith('image/') || file.size <= 1.5 * 1024 * 1024) return file.size <= MAX_UPLOAD ? file : null
   try {
     const bmp = await createImageBitmap(file)
-    const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height))
+    const k = Math.min(1, 2048 / Math.max(bmp.width, bmp.height))
     const c = document.createElement('canvas')
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
     c.getContext('2d')?.drawImage(bmp, 0, 0, c.width, c.height)
@@ -84,7 +84,7 @@ export default function ReadMode({ command, shared }: {
 
   // Quick photo: read the current frame straight away (for sighted helpers or a well-framed page)
   const snap = () => run(async () => {
-    const img = await frame(cam, 1600, 0.9); if (!img) return
+    const img = await frame(cam, 2048, 0.9); if (!img) return
     await readFile(img)
   })
   // Scan: guided capture (talks you into framing, auto-captures, never gets stuck), then reads it
@@ -114,7 +114,7 @@ export default function ReadMode({ command, shared }: {
     setQuestion('')
   })
   const moneyCheck = (mode: MoneyMode) => run(async () => {
-    const img = await frame(cam, 1280, 0.88); if (!img) return
+    const img = await frame(cam, 1600, 0.9); if (!img) return   // note digits need detail
     // Send what the app knows (bill total, amount paid) so the server needs no memory between calls
     const b = lastRead.current?.bill
     const billTotal = b ? (b.printed_total ?? (b.items.length ? b.computed_total : null)) : null

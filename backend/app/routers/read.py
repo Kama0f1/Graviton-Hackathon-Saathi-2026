@@ -1,5 +1,6 @@
 """Read mode: /read (document or bill) and /read/ask (questions about the last one)."""
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, UploadFile
@@ -12,6 +13,49 @@ from ..services.phrases import qty, say_money, t
 
 router = APIRouter(tags=["read"])
 RETAKE_FIELDS = {"printed_total", "items"}
+VERIFY = ("\n\nSECOND LOOK\nA first reading of this bill did not add up or had numbers marked unreadable. Read every item amount "
+          "and the printed total again, slowly, digit by digit, and check the decimal points. Report exactly what is printed.")
+
+
+def _prompt(lang: str) -> str:
+    today = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime("%d %B %Y")  # India time, for expiry dates
+    return prompts.load("read", lang, today=today)
+
+
+def _adds_up(ai: AIRead) -> bool:
+    amounts = [i.amount for i in ai.items if i.amount is not None]
+    return bool(amounts) and ai.printed_total is not None and len(amounts) == len(ai.items) \
+        and abs(sum(amounts) - ai.printed_total) <= bill_check.TOLERANCE
+
+
+def _same_numbers(a: AIRead, b: AIRead) -> bool:
+    x = sorted(i.amount for i in a.items if i.amount is not None)
+    y = sorted(i.amount for i in b.items if i.amount is not None)
+    return x == y and a.printed_total == b.printed_total
+
+
+async def _read_bill_carefully(ai: AIRead, data: bytes, mime: str, lang: str) -> AIRead:
+    """Bills are checked by maths: if the items add up to the printed total, the reading is right (even if the model was
+    unsure). If not, a second, slower look decides between a misread and a real overcharge."""
+    if ai.kind != "bill" or (_adds_up(ai) and not any(i.amount is None for i in ai.items)):
+        return _trusted(ai) if _adds_up(ai) else ai
+    try:
+        again = await gemini.ask(_prompt(lang) + VERIFY, AIRead, [(data, mime)], model=GEMINI_READ_MODEL, timeout=20)
+    except Exception:  # noqa: BLE001 - the first reading still stands
+        return ai
+    if again.kind != "bill":
+        return ai
+    if _adds_up(again):
+        return _trusted(again)
+    if _same_numbers(ai, again) and again.items and again.printed_total is not None:
+        return _trusted(again)   # two careful readings agree: the bill really does not add up (overcharge)
+    return again
+
+
+def _trusted(ai: AIRead) -> AIRead:
+    """The numbers are confirmed, so they are not "uncertain" any more."""
+    ai.uncertain = [u for u in ai.uncertain if u not in RETAKE_FIELDS]
+    return ai
 
 
 def _from_context(raw: str) -> Optional[dict]:
@@ -45,8 +89,9 @@ def _item_line(item: BillItem, currency: str, lang: str) -> str:
 @router.post("/read", response_model=ReadResult)
 async def read(file: UploadFile = File(...), lang: str = Form("en"), session_id: str = Form("")):
     lang = prompts.lang_code(lang)
-    data, mime = await media.read_upload(file, allow_pdf=True, max_side=1600)  # bills need detail
-    ai = await gemini.ask(prompts.load("read", lang), AIRead, [(data, mime)], model=GEMINI_READ_MODEL, timeout=22)
+    data, mime = await media.read_upload(file, allow_pdf=True, max_side=2048)  # small print on bills needs detail
+    ai = await gemini.ask(_prompt(lang), AIRead, [(data, mime)], model=GEMINI_READ_MODEL, timeout=22)
+    ai = await _read_bill_carefully(ai, data, mime, lang)
     fields = {f.name: f.value for f in ai.key_fields}
     session.save(session_id, {"doc_type": ai.doc_type, "text": ai.full_text, "fields": fields})
 

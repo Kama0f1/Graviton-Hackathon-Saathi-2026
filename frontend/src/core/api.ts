@@ -40,6 +40,8 @@ export type MoneyResult = {
   expected_change: number | null; difference: number | null
   suspicious: { value: number; reason: 'not_rbi' | 'toy_text' | 'photocopy' | 'mismatch' | 'other' }[]
   unclear: boolean
+  maybe?: number[]                                   // unsure between these values, e.g. [10, 20]
+  checks?: ('rbi_text' | 'gandhi' | 'thread')[]      // note check: features that looked right
 }
 
 export class ApiError extends Error {
@@ -65,6 +67,9 @@ export const isBusy = () => busy > 0
 type Field = string | number | Blob | null | undefined
 type Opts = { timeoutMs?: number; quiet?: boolean; lang?: Lang }
 
+/** When the server last answered anything. The health check skips itself while real requests are getting answers. */
+export let lastReply = 0
+
 async function post(path: string, fields: Record<string, Field>, opts: Opts = {}): Promise<Response> {
   const { timeoutMs = 30000, quiet = false } = opts
   const fd = new FormData()
@@ -84,6 +89,7 @@ async function post(path: string, fields: Record<string, Field>, opts: Opts = {}
     let res: Response
     try {
       res = await fetch(API_URL + path, { method: 'POST', body: fd, signal: ctrl.signal })
+      lastReply = Date.now() // any answer at all (even an error) means the server is reachable
     } catch {
       throw new ApiError(0, ctrl.signal.aborted ? t('timeout') : t('offline'))
     }
@@ -107,7 +113,9 @@ const json = async <T,>(p: Promise<Response>) => (await p).json() as Promise<T>
 export const api = {
   health: async (): Promise<boolean> => {
     try {
-      const r = await fetch(API_URL + '/health', { signal: AbortSignal.timeout(5000) })
+      // 12 s: a server that has been asleep (free hosting) can take several seconds to wake up
+      const r = await fetch(API_URL + '/health', { signal: AbortSignal.timeout(12000), cache: 'no-store' })
+      if (r.ok) lastReply = Date.now()
       return r.ok
     } catch { return false }
   },

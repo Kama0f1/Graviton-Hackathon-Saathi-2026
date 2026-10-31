@@ -17,7 +17,8 @@ async def guidance(
     lang: str = Form("en"),
     session_id: str = Form(""),
 ):
-    target = "bill" if target == "bill" else "document"
+    # "document" also covers product labels and price tags on packets (the text area on them is small)
+    target = "bill" if target == "bill" else "document, bill, product label or price tag"
     data, mime = await media.read_upload(image, max_side=768)
     try:
         ai = await gemini.ask(

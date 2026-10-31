@@ -79,6 +79,8 @@ class MoneyResult(BaseModel):
     difference: Optional[float] = None        # change got - expected (negative = short)
     suspicious: list[SuspectNote] = Field(default_factory=list)  # notes with OBVIOUS fake signs
     unclear: bool = False
+    maybe: list[float] = Field(default_factory=list)  # unclear between these values, e.g. [10, 20]
+    checks: list[str] = Field(default_factory=list)   # note check: what looked right ("rbi_text", "gandhi", "thread")
 
 
 class ErrorResult(BaseModel):

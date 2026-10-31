@@ -53,8 +53,40 @@ def test_bill_correct_total(monkeypatch):
     assert "Warning" not in body["speech"]
 
 
-def test_bill_unclear_total_asks_retake(monkeypatch):
+def test_unsure_total_that_adds_up_is_trusted(monkeypatch):
+    # the model marked the total unsure, but the items add up to it: the maths confirms the reading, no retake
     body = post("/read", monkeypatch, bill(4350, ["printed_total"]), field="file").json()
+    assert "take the photo again" not in body["speech"] and body["uncertain"] == []
+
+
+def test_second_look_fixes_a_misread(monkeypatch):
+    first, second = bill(4350), bill(4350)
+    first.items[0].amount += 600          # misread digit: does not add up
+    answers = iter([first, second])
+
+    async def ask(prompt, schema, files=(), model=None, **kw):
+        return next(answers)
+    monkeypatch.setattr(gemini, "ask", ask)
+    body = client.post("/read", data={"lang": "en"}, files={"file": ("x.jpg", JPEG, "image/jpeg")}).json()
+    assert body["bill"]["mismatch"] is False and "take the photo again" not in body["speech"]
+
+
+def test_two_readings_agree_on_overcharge(monkeypatch):
+    ai = bill(4350)
+    ai.printed_total = 4830                # really overcharged: both looks see the same numbers
+    body = post("/read", monkeypatch, ai, field="file").json()
+    assert body["bill"]["mismatch"] is True and "4,830" in body["speech"]
+
+
+def test_unreadable_and_not_adding_up_asks_retake(monkeypatch):
+    first, second = bill(4350, ["printed_total"]), bill(4350, ["printed_total"])
+    first.printed_total, second.printed_total = 4950, 5350   # two different guesses, both unsure
+    answers = iter([first, second])
+
+    async def ask(prompt, schema, files=(), model=None, **kw):
+        return next(answers)
+    monkeypatch.setattr(gemini, "ask", ask)
+    body = client.post("/read", data={"lang": "en"}, files={"file": ("x.jpg", JPEG, "image/jpeg")}).json()
     assert "take the photo again" in body["speech"]
 
 
@@ -130,3 +162,17 @@ def test_missing_key_gives_speakable_error(monkeypatch):
     monkeypatch.setattr(gemini, "ask", broken)
     r = client.post("/describe", data={"lang": "en"}, files={"image": ("x.jpg", JPEG, "image/jpeg")})
     assert r.status_code == 503 and r.json()["speech"]
+
+
+def test_read_prompt_knows_today_for_expiry_dates(monkeypatch):
+    seen = {}
+
+    async def ask(prompt, schema, files=(), model=None, **kw):
+        seen["prompt"] = prompt
+        return AIRead(kind="document", doc_type="price tag", summary_speech="Amul butter, 100 grams. MRP 58 rupees.",
+                      full_text="MRP 58", key_fields=[AIField(name="mrp", value="58 rupees")], shop=None, items=[],
+                      printed_total=None, currency="INR", uncertain=[])
+    monkeypatch.setattr(gemini, "ask", ask)
+    body = client.post("/read", data={"lang": "en"}, files={"file": ("x.jpg", JPEG, "image/jpeg")}).json()
+    assert "{today}" not in seen["prompt"] and "Today is " in seen["prompt"] and "PRICE TAG" in seen["prompt"]
+    assert body["kind"] == "document" and body["speech"].startswith("Amul butter")

@@ -14,6 +14,7 @@ const LINES: Line[] = [
   { key: 'bin', group: 'walk', cmd: { cmd: 'bin' }, color: 'green' },
   { key: 'findBin', group: 'walk', cmd: { cmd: 'findBin' }, color: 'green' },
   { key: 'read', group: 'read', cmd: { cmd: 'guide' }, color: 'purple' },
+  { key: 'price', group: 'read', cmd: { cmd: 'guide' }, color: 'blue' },
   { key: 'more', group: 'read', cmd: { cmd: 'more' }, color: 'purple' },
   { key: 'count', group: 'money', cmd: { cmd: 'count' }, color: 'coral' },
   { key: 'paid', group: 'money', cmd: { cmd: 'paid', amount: 500 }, color: 'coral' },

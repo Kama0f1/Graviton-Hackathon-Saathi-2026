@@ -8,7 +8,7 @@ import SayTab from './modes/SayTab'
 import SettingsTab from './modes/SettingsTab'
 import Icon, { type IconName } from './components/Icon'
 import { onCaption, onVoiceIssue, repeat, say, stop, type Caption } from './core/speech'
-import { api, onBusy } from './core/api'
+import { api, lastReply, onBusy } from './core/api'
 import { getLang, onLang, setLang, setObstacles, type Lang } from './core/settings'
 import { canListen, listen, parseAlternatives, type Command } from './core/listen'
 import { haptics } from './core/haptics'
@@ -46,20 +46,29 @@ export default function App() {
   useEffect(() => { if (!greeted) { greeted = true; say(t('ready'), 'info') } }, [])
   useEffect(() => onVoiceIssue(setVoiceIssue), [])
 
-  // Is the backend reachable? Without it nothing but obstacle alerts and directions works, so say so clearly.
+  // Is the backend reachable? Only say "not connected" when it really is: two failed checks in a row (a slow wake-up
+  // or one dropped packet is not an outage), never while real requests are being answered, never while hidden.
   useEffect(() => {
     let alive = true
-    let wasDown = false
+    let fails = 0
+    let told = false
     const check = async () => {
-      const ok = await api.health()
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastReply < 20000) { fails = 0; setServer('up'); return }
+      const ok = navigator.onLine && await api.health()
       if (!alive) return
-      setServer(ok ? 'up' : 'down')
-      if (!ok && !wasDown) say(t('serverDown'), 'info')
-      wasDown = !ok
+      fails = ok ? 0 : fails + 1
+      if (ok) { setServer('up'); told = false; return }
+      if (fails >= 2 || !navigator.onLine) {
+        setServer('down')
+        if (!told) { told = true; say(t('serverDown'), 'info') }
+      }
     }
     void check()
     const id = setInterval(check, 15000)
-    return () => { alive = false; clearInterval(id) }
+    const back = () => { fails = 0; void check() }
+    window.addEventListener('online', back)
+    return () => { alive = false; clearInterval(id); window.removeEventListener('online', back) }
   }, [])
 
   // soft tick while waiting for the server (a sound, not words)

@@ -82,6 +82,7 @@ export function matchCommand(raw: string, mode: Mode, allowWeak = true): Command
   if (has(s, ['obstacle off', 'obstacles off', 'stop obstacle', 'रुकावट बंद', 'ਰੁਕਾਵਟ ਬੰਦ'])) return { cmd: 'obstaclesOff' }
   if (has(s, ['fake', 'real note', 'check note', 'check the note', 'is this note', 'नकली', 'असली', 'ਨਕਲੀ', 'ਅਸਲੀ'])) return { cmd: 'note' }
 
+  if (has(s, ['how much money', 'count my money', 'kitne paise', 'कितने पैसे', 'ਕਿੰਨੇ ਪੈਸੇ'])) return { cmd: 'count' }
   // from here on, a long sentence in Read mode that does not START like a command is a question
   const longQuestion = mode === 'read' && n >= 5 && QUESTION.test(s)
   if (!longQuestion) {
@@ -93,6 +94,8 @@ export function matchCommand(raw: string, mode: Mode, allowWeak = true): Command
   }
   if (has(s, ['guide', 'गाइड', 'ਗਾਈਡ'])) return { cmd: 'guide' }
   if (has(s, ['read this', 'read bill', 'read the bill', 'read it', 'scan', 'पढ़ो', 'पढ़ें', 'पढ़ दो', 'ਪੜ੍ਹੋ', 'ਪੜ੍ਹ ਦਿਓ'])) return mode === 'read' ? { cmd: 'snap' } : { cmd: 'read' }
+  // price tag / food packet: "what's the price", "MRP", "expiry date", "कीमत", "ਕੀਮਤ" -> scan it straight away
+  if (has(s, ['price', 'mrp', 'expiry', 'expiry date', 'best before', 'how much is this', 'कीमत', 'दाम', 'एमआरपी', 'एक्सपायरी', 'ਕੀਮਤ', 'ਮੁੱਲ', 'ਐਕਸਪਾਇਰੀ'])) return { cmd: 'snap' }
   if (has(s, ['read mode', 'reading mode', 'रीड मोड', 'ਰੀਡ ਮੋਡ'])) return { cmd: 'read' }
   if (has(s, ['navigate', 'navigation', 'नेविगेट', 'ਨੈਵੀਗੇਟ'])) return { cmd: 'navigate' }
   // weak guess: a bare "read ..." - only used if no other recogniser guess is a clearer command

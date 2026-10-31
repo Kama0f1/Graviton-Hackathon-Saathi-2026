@@ -7,14 +7,25 @@ RULES
 
 TASK
 Read the attached document or bill for a blind person.
-- `kind`: "bill" only for a shop bill, receipt or invoice that lists items with amounts. Everything else, including electricity bills, bank statements and letters, is "document".
+- `kind`: "bill" only for a shop bill, receipt or invoice that lists several bought items with amounts. Everything else is "document",
+  including electricity bills, bank statements, letters, AND food packets, product labels, price tags and shelf price labels.
 - `doc_type`: a short type, e.g. "bank letter", "electricity bill", "shop bill", "prescription".
 - `full_text`: all readable text in reading order, in its original language.
 - `key_fields`: the values a blind person most needs: dates, due dates, amounts, names, account or reference numbers. Use short names like "due_date", "amount".
 - `summary_speech`: for a document, what it is and the single most important point, in {lang}. For a bill, just "Shop bill" in {lang}.
+- PRODUCT, FOOD PACKET OR PRICE TAG: `doc_type` "price tag" or "product label". `summary_speech` says, in this order and only what is printed:
+  the product name and size, then the price ("MRP 45 rupees"; if a sale or offer price is also printed, say both),
+  then the expiry or best-before date. Today is {today}: if that date has passed, say clearly that it has EXPIRED.
+  If only a manufacturing date and "best before N months" are printed, work out the best-before date and say it.
+  Put them in `key_fields` too: "product", "mrp", "price", "best_before" (or "expiry"), "net_weight", and "veg" as "veg" or "non-veg"
+  if the green or brown mark is printed. MRP often appears as "M.R.P. ₹45.00 (Incl. of all taxes)": that is 45 rupees.
 - For a bill: `shop` as printed; every line item in `items` with `name`, `qty`, `unit` and `amount` exactly as printed; `printed_total` exactly as printed. Do NOT calculate, add up or correct anything.
 - `currency`: ISO code of the bill's money: "INR" for ₹, Rs or any Indian bill; "EUR" for €; "USD" for $; "GBP" for £. If unclear, "INR".
 - Item lines like "1x27 4.00" mean qty 1 of item code 27 costing 4.00; use the code as `name` if no name is written.
 - If more than one bill or receipt is visible, read only the clearest one and add "multiple_bills" to `uncertain`.
 - For a document: `items` is an empty list, `shop` and `printed_total` are null.
-- `uncertain`: field names you could not read clearly. Use exactly "printed_total" or "items" for bill numbers, otherwise the key_field name. Empty list if everything is clear.
+- Read every amount digit by digit. Watch for 1 vs 7, 3 vs 8, 5 vs 6, 0 vs 8 and the decimal point ("45.00" is 45, not 4500).
+  The amount is usually the right-most number on an item line; the total is usually labelled Total / Grand Total / Net Amount / कुल.
+- `uncertain`: ONLY fields where a digit is physically unreadable (torn, smudged, covered, cut off by the photo edge).
+  Use exactly "printed_total" or "items" for bill numbers, otherwise the key_field name. Do not list a field just to be careful:
+  if you can read it, it is not uncertain. Empty list if everything is readable.

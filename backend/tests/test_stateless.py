@@ -5,7 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.schemas import AIMoney, AIMoneyItem, SpeechOnly
+from app.schemas import AICash, AIPiece, SpeechOnly
 from app.services import gemini, session
 
 client = TestClient(app)
@@ -44,7 +44,9 @@ def test_bad_context_falls_back_politely(monkeypatch):
 
 
 def test_change_check_with_no_server_memory(monkeypatch):
-    change = AIMoney(items=[AIMoneyItem(value=50, kind="note", count=1)], currency="INR", unclear=False, suspicious=[])
+    change = AICash(pieces=[AIPiece(kind="note", side="front", numeral_seen="50", words_seen="", colour="blue", value=50,
+                                   fully_visible=True, rbi_text=True, gandhi_portrait=True, security_thread=True)],
+                    currency="INR", suspicious=[])
     monkeypatch.setattr(gemini, "ask", capture(change, []))
     r = client.post("/money", data={"mode": "change", "lang": "en", "session_id": "fresh-2", "bill_total": "430", "paid": "500"},
                     files={"image": ("x.jpg", JPEG, "image/jpeg")}).json()

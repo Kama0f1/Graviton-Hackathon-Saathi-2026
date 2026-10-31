@@ -2,7 +2,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.schemas import AIBillItem, AIMoney, AIMoneyItem, AIRead, AISuspect
+from app.schemas import AIBillItem, AICash, AIPiece, AIRead, AISuspect
 from app.services import gemini
 
 client = TestClient(app)
@@ -15,10 +15,16 @@ def fake(answer):
     return _ask
 
 
+def piece(v, numeral=None, words="", kind=None, side="front", visible=True, thread=True):
+    kind = kind or ("note" if v >= 10 and v not in (1, 2, 5) else "coin")
+    return AIPiece(kind=kind, side=side, numeral_seen=str(int(v)) if numeral is None else numeral, words_seen=words,
+                   colour="", value=v, fully_visible=visible, rbi_text=kind == "note", gandhi_portrait=kind == "note",
+                   security_thread=thread and kind == "note")
+
+
 def cash(*pairs, unclear=False, suspicious=()):
-    return AIMoney(items=[AIMoneyItem(value=v, kind="note" if v >= 10 and v not in (1, 2, 5) else "coin", count=c)
-                          for v, c in pairs], currency="INR", unclear=unclear,
-                  suspicious=list(suspicious))
+    pieces = [piece(v, visible=not unclear) for v, c in pairs for _ in range(c)]
+    return AICash(pieces=pieces, currency="INR", suspicious=list(suspicious))
 
 
 def send(monkeypatch, answer, path="/money", **data):
@@ -70,8 +76,46 @@ def test_change_needs_bill_first(monkeypatch):
 
 
 def test_fake_denomination_is_unclear(monkeypatch):
-    body = send(monkeypatch, cash((300, 1)), session_id="odd")  # no 300 rupee note exists
-    assert body["unclear"] is True and "take the photo again" in body["speech"]
+    body = send(monkeypatch, AICash(pieces=[piece(300, numeral="300")], currency="INR", suspicious=[]), session_id="odd")
+    assert body["unclear"] is True and "take the photo again" in body["speech"]  # no 300 rupee note exists
+
+
+def test_printed_digits_beat_the_guess(monkeypatch):
+    # the model said 20, but the digits it read are 10: the note is a 10
+    body = send(monkeypatch, AICash(pieces=[piece(20, numeral="10")], currency="INR", suspicious=[]), session_id="ten")
+    assert body["total"] == 10 and body["items"][0]["value"] == 10
+
+
+def test_words_and_devanagari_digits(monkeypatch):
+    p1 = piece(20, numeral="", words="दस रुपये")
+    p2 = piece(50, numeral="५००")
+    body = send(monkeypatch, AICash(pieces=[p1, p2], currency="INR", suspicious=[]), session_id="dev")
+    assert sorted(i["value"] for i in body["items"]) == [10, 500]
+
+
+def test_models_disagree_without_evidence_asks_which(monkeypatch):
+    answers = {"main": AICash(pieces=[piece(20, numeral="")], currency="INR", suspicious=[]),
+               "fast": AICash(pieces=[piece(10, numeral="")], currency="INR", suspicious=[])}
+
+    async def ask(prompt, schema, files=(), model=None, **kw):
+        return answers["fast" if model == "fast" else "main"]
+    import app.routers.money as money_router
+    monkeypatch.setattr(money_router, "GEMINI_MODEL", "fast")
+    monkeypatch.setattr(gemini, "ask", ask)
+    body = client.post("/money", data={"lang": "en", "session_id": "vote"}, files={"image": ("x.jpg", JPEG, "image/jpeg")}).json()
+    assert body["unclear"] and body["maybe"] == [10, 20]
+    assert body["speech"].startswith("I am not sure if this is a 10 or a 20 rupee note")
+
+
+def test_note_check_says_which_note(monkeypatch):
+    body = send(monkeypatch, cash((500, 1)), mode="check", session_id="which")
+    assert body["speech"].startswith("This is a 500 rupee note. No signs of a fake")
+    assert body["checks"] == ["rbi_text", "gandhi", "thread"]
+
+
+def test_note_check_back_side_asks_to_turn(monkeypatch):
+    body = send(monkeypatch, AICash(pieces=[piece(100, side="back")], currency="INR", suspicious=[]), mode="check", session_id="back")
+    assert body["speech"] == "This is a 100 rupee note. Turn it over so I can see Gandhi's portrait and the security thread."
 
 
 def test_paid_can_be_spoken_instead(monkeypatch):
@@ -96,7 +140,7 @@ def test_check_flags_toy_note(monkeypatch):
 
 def test_check_never_says_genuine(monkeypatch):
     body = send(monkeypatch, cash((500, 2)), mode="check", session_id="chk2")
-    assert body["speech"].startswith("No obvious signs of a fake on 2 notes")
+    assert body["speech"].startswith("2 notes: 500, 500 rupees. No signs of a fake")
     assert "genuine" not in body["speech"].lower() and "real" not in body["speech"].lower()
 
 

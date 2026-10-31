@@ -63,8 +63,20 @@ export function fromMoney(m: MoneyResult): ResultView {
     return { tone: 'warning', accent: 'pink', label, headline: t('mayBeFake', { n: money(m.suspicious[0].value, cur) }),
       detail: `${t(why)}. ${t('doNotAccept')}`, chips }
   }
+  if (m.unclear && m.maybe && m.maybe.length >= 2)
+    return { tone: 'warning', label, headline: t('whichNote', { a: money(m.maybe[0], cur), b: money(m.maybe[1], cur) }), detail: t('holdFlat'), chips }
   if (m.unclear) return { tone: 'warning', label, headline: t('spreadRetake'), chips }
-  if (m.mode === 'check') return { tone: 'success', label, headline: t('noObviousFake'), detail: t('checkBank'), chips }
+  if (m.mode === 'check') {
+    const notes = m.items.filter((i) => i.kind === 'note').flatMap((i) => Array<number>(i.count).fill(i.value)).sort((a, b) => b - a)
+    const checks = (m.checks ?? []).map((c) => t(`chk_${c}` as PhraseKey))
+    const allSeen = (m.checks ?? []).length === 3
+    return {
+      tone: 'success', label,
+      headline: notes.length === 1 ? t('noteIs', { n: money(notes[0], cur) }) : notes.map((v) => money(v, cur)).join(' + '),
+      detail: allSeen ? `${t('noObviousFake')}. ${t('checkBank')}` : (m.checks ?? []).includes('gandhi') ? t('checkBank') : t('turnNote'),
+      chips: checks,
+    }
+  }
   if (m.mode === 'change' && m.difference != null) {
     if (Math.abs(m.difference) <= 0.5) return { tone: 'success', label, headline: t('correctChange', { n: money(m.total, cur) }), chips }
     return {

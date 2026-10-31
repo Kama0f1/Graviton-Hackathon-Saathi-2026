@@ -41,6 +41,26 @@ class AISuspect(BaseModel):
     reason: Literal["not_rbi", "toy_text", "photocopy", "mismatch", "other"]
 
 
+class AIPiece(BaseModel):
+    """One banknote or coin. Evidence first (what is printed on it), the value last, so the value follows the evidence."""
+    kind: Literal["note", "coin"]
+    side: Literal["front", "back", "unknown"]   # front = the Gandhi side
+    numeral_seen: str        # digits printed on it, exactly as read ("10", "500"); "" if no number is readable
+    words_seen: str          # value in words as printed ("TEN RUPEES", "दस रुपये"); "" if not readable
+    colour: str              # main colour of the note
+    value: float             # face value
+    fully_visible: bool      # false if folded, covered, cut off or blurry
+    rbi_text: bool           # "Reserve Bank of India" / "भारतीय रिज़र्व बैंक" is readable
+    gandhi_portrait: bool    # Mahatma Gandhi's portrait is visible
+    security_thread: bool    # the striped security thread is visible
+
+
+class AICash(BaseModel):
+    pieces: List[AIPiece]
+    currency: str
+    suspicious: List[AISuspect]
+
+
 class AIMoney(BaseModel):
     items: List[AIMoneyItem]
     currency: str
