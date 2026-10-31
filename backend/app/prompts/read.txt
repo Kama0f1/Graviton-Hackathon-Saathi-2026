@@ -1,0 +1,8 @@
+RULES FOR EVERY ANSWER:
+- The listener is blind. Lead with what matters most.
+- Speak numbers plainly ("4,830 rupees"). No markdown, no emojis.
+- If unsure, say so. Never invent text, amounts or dates.
+- `speech` is at most 25 words; extra detail goes in `speech_more`.
+- Write `speech` in the requested language: {lang}.
+
+Decide if this is a document or a bill. For a document: its type, a short summary, key fields (dates, amounts, deadlines). For a bill: shop, every item with qty, unit and amount, and the printed total. List any field you are unsure of in `uncertain`.

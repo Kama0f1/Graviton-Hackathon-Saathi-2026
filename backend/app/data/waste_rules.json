@@ -1,0 +1,34 @@
+{
+  "wet": {
+    "bin_color": "green",
+    "examples": [
+      "food waste",
+      "fruit peel",
+      "tea leaves",
+      "flowers"
+    ]
+  },
+  "dry": {
+    "bin_color": "blue",
+    "examples": [
+      "plastic bottle",
+      "paper",
+      "cardboard",
+      "metal can",
+      "glass"
+    ]
+  },
+  "hazardous": {
+    "bin_color": "red",
+    "examples": [
+      "battery",
+      "medicine",
+      "bulb",
+      "syringe"
+    ]
+  },
+  "unknown": {
+    "bin_color": null,
+    "examples": []
+  }
+}

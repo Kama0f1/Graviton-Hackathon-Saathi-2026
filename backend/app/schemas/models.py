@@ -1,0 +1,59 @@
+# THE API CONTRACT. Frontend depends on these shapes — change only with both sides agreeing.
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
+
+Lang = Literal["en", "hi", "pa"]
+
+
+class SpeechOnly(BaseModel):
+    speech: str
+
+
+class SignResult(BaseModel):
+    speech: str
+    text: str
+    confident: bool
+
+
+class WasteResult(BaseModel):
+    speech: str
+    item: str
+    category: Literal["wet", "dry", "hazardous", "unknown"]
+    bin_color: Optional[Literal["green", "blue", "red"]] = None
+    confident: bool
+
+
+class GuidanceResult(BaseModel):
+    ready: bool
+    move: Literal["left", "right", "up", "down", "closer", "back", "hold", "light", "none"]
+    speech: str
+
+
+class BillItem(BaseModel):
+    name: str
+    qty: Optional[float] = None
+    unit: Optional[str] = None
+    amount: float
+
+
+class Bill(BaseModel):
+    shop: Optional[str] = None
+    items: list[BillItem] = Field(default_factory=list)
+    printed_total: Optional[float] = None
+    computed_total: Optional[float] = None
+    mismatch: bool = False
+
+
+class ReadResult(BaseModel):
+    kind: Literal["document", "bill"]
+    speech: str
+    speech_more: str = ""
+    doc_type: Optional[str] = None
+    key_fields: dict = Field(default_factory=dict)
+    bill: Optional[Bill] = None
+    uncertain: list[str] = Field(default_factory=list)
+
+
+class ErrorResult(BaseModel):
+    error: str
+    speech: str = "Sorry, I couldn't do that. Please try again."
