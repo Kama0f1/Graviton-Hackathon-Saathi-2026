@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Saathi frontend (React + Vite PWA)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Mobile-first app for blind and low-vision users: Navigate (obstacles, signs, waste, bin finder) and
+Read (documents, bills + overcharge check, money count / change / fake-note check).
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Run (laptop)
 ```
+npm install
+npm run dev
+```
+Open http://localhost:5173 in Chrome. The backend must be running on http://127.0.0.1:8000
+(`uvicorn app.main:app --host 0.0.0.0 --port 8000` in `backend/`). Calls go to `/api/...`
+and the Vite dev server forwards them to the backend (see `vite.config.ts`), so no CORS or URL setup.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Run on a phone
+The camera needs HTTPS. Easiest: `cloudflared tunnel --url http://localhost:5173` and open the
+https URL it prints in Chrome on the phone. Only ONE tunnel is needed (the backend is reached via /api).
+
+## Where things are
+- `src/App.tsx`: shell, top bar, language switch, home cards, bottom dock (caption, mic, repeat, stop)
+- `src/modes/NavigateMode.tsx`, `src/modes/ReadMode.tsx`: the two modes
+- `src/core/`: `api.ts` (backend client), `speech.ts` (priority speech queue; alerts interrupt, answers resume),
+  `listen.ts` (voice commands en/hi/pa), `camera.ts`, `guidance.ts` (guided capture), `audio.ts`, `haptics.ts`, `result.ts`
+- `src/vision/`: `objectDetection.ts` + `detector.ts` (COCO-SSD obstacle alerts), `binFinder.ts` (colour bin finder)
+- `src/i18n/phrases.ts`: every app sentence in English, Hindi, Punjabi
+- `public/manifest.webmanifest`, `public/sw.js`, `public/icons/`: installable app + WhatsApp share target

@@ -1,3 +1,1 @@
-/* High contrast, huge touch targets. Two halves fill the screen. */
-html, body, #root { height: 100%; margin: 0; background: #000; color: #fff; font-family: system-ui, sans-serif; }
-.app { height: 100%; display: grid; grid-template-rows: 1fr 1fr; }
+/* Unused (old scaffold). Styles live in index.css (tokens) and App.css (layout). */
