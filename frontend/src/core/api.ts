@@ -26,7 +26,7 @@ export type Bill = {
   printed_total: number | null; computed_total: number | null; mismatch: boolean
 }
 export type ReadResult = {
-  kind: 'document' | 'bill'; speech: string; speech_more: string
+  kind: 'document' | 'bill'; speech: string; speech_more: string; full_text?: string
   doc_type: string | null; key_fields: Record<string, string>
   bill: Bill | null; uncertain: string[]
 }
@@ -85,7 +85,7 @@ async function post(path: string, fields: Record<string, Field>, opts: Opts = {}
       throw new ApiError(0, ctrl.signal.aborted ? t('timeout') : t('offline'))
     }
     if (!res.ok) {
-      let speech: string = t('error')
+      let speech: string = res.status === 413 ? t('tooBig') : t('error')
       try { const j = await res.json(); if (j?.speech) speech = j.speech } catch { /* not json */ }
       throw new ApiError(res.status, speech)
     }
@@ -114,7 +114,8 @@ export const api = {
   guidance: (image: Blob, target: 'document' | 'bill' = 'document') =>
     json<GuidanceResult>(post('/guidance', { image, target }, { quiet: true, timeoutMs: 9000 })),
   read: (file: Blob) => json<ReadResult>(post('/read', { file }, { timeoutMs: 45000 })),
-  ask: (question: string) => json<SpeechOnly>(post('/read/ask', { question })),
+  // `context` = the document the app read last, so questions work even if the server forgot it (serverless)
+  ask: (question: string, context?: string) => json<SpeechOnly>(post('/read/ask', { question, context })),
   money: (image: Blob, mode: MoneyMode, extra: { paid?: number; bill_total?: number } = {}) =>
     json<MoneyResult>(post('/money', { image, mode, ...extra })),
   tts: async (text: string, lang: Lang) =>

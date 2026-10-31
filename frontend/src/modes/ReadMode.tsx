@@ -13,6 +13,24 @@ import type { Command } from '../core/listen'
 import { frame } from './useFrame'
 import { t } from '../i18n/phrases'
 
+const MAX_UPLOAD = 4 * 1024 * 1024  // hosting limit is 4.5 MB per request
+
+// Big phone photos are shrunk before upload (also faster on mobile data). PDFs can't be shrunk here.
+async function fitUpload(file: Blob): Promise<Blob | null> {
+  if (!file.type.startsWith('image/') || file.size <= 1.5 * 1024 * 1024) return file.size <= MAX_UPLOAD ? file : null
+  try {
+    const bmp = await createImageBitmap(file)
+    const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height))
+    const c = document.createElement('canvas')
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
+    c.getContext('2d')?.drawImage(bmp, 0, 0, c.width, c.height)
+    bmp.close()
+    const out = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/jpeg', 0.9))
+    if (out && out.size <= MAX_UPLOAD) return out
+  } catch { /* fall through */ }
+  return file.size <= MAX_UPLOAD ? file : null
+}
+
 export default function ReadMode({ command, shared }: {
   command: (Command & { id: number }) | null
   shared: Blob | null
@@ -33,7 +51,9 @@ export default function ReadMode({ command, shared }: {
 
   const run = async (fn: () => Promise<void>) => { try { await fn() } catch (e) { if (!(e instanceof ApiError)) console.error(e) } }
 
-  const readFile = (file: Blob) => run(async () => {
+  const readFile = (input: Blob) => run(async () => {
+    const file = await fitUpload(input)
+    if (!file) { say(t('tooBig'), 'answer'); haptics.warning(); return }
     const url = file.type.startsWith('image/') ? URL.createObjectURL(file) : null
     setPreview(url)
     setReading(true)
@@ -78,19 +98,27 @@ export default function ReadMode({ command, shared }: {
   }
   const ask = (q: string) => run(async () => {
     if (!q.trim()) return
-    const r = await api.ask(q.trim())
+    const d = lastRead.current
+    const context = d ? JSON.stringify({ doc_type: d.doc_type, text: d.full_text ?? d.speech_more, fields: d.key_fields }) : undefined
+    const r = await api.ask(q.trim(), context)
     setResult(fromSpeech('ANSWER', r))
     say(r.speech, 'answer')
     setQuestion('')
   })
   const moneyCheck = (mode: MoneyMode) => run(async () => {
     const img = await frame(cam, 1280, 0.88); if (!img) return
-    const r = await api.money(img, mode, mode === 'change' && paid.current != null ? { paid: paid.current } : {})
+    // Send what the app knows (bill total, amount paid) so the server needs no memory between calls
+    const b = lastRead.current?.bill
+    const billTotal = b ? (b.printed_total ?? (b.items.length ? b.computed_total : null)) : null
+    const extra: { paid?: number; bill_total?: number } = {}
+    if (billTotal != null) extra.bill_total = billTotal
+    if (mode === 'change' && paid.current != null) extra.paid = paid.current
+    const r = await api.money(img, mode, extra)
     const view = fromMoney(r)
     setResult(view)
     say(r.speech, r.suspicious.length ? 'alert' : 'answer')
     if (view.tone === 'warning') haptics.warning(); else if (view.tone === 'success') haptics.success()
-    if (mode === 'count') paid.current = undefined
+    if (mode === 'count') paid.current = r.paid ?? undefined
   })
 
   useEffect(() => {

@@ -1,0 +1,8 @@
+tests/
+live_test.py
+check_keys.py
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env

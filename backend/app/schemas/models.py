@@ -49,6 +49,7 @@ class ReadResult(BaseModel):
     kind: Literal["document", "bill"]
     speech: str
     speech_more: str = ""
+    full_text: str = ""  # the whole text; the app sends it back with questions (works without server memory)
     doc_type: Optional[str] = None
     key_fields: dict = Field(default_factory=dict)
     bill: Optional[Bill] = None

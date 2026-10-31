@@ -31,3 +31,6 @@ backend/tests/samples/real/*
 
 # scratch screenshots from design/AI tools
 Claude outputs/
+
+# vercel cli
+.vercel/

@@ -1,4 +1,7 @@
 """Read mode: /read (document or bill) and /read/ask (questions about the last one)."""
+import json
+from typing import Optional
+
 from fastapi import APIRouter, File, Form, UploadFile
 
 from ..schemas import AIRead, Bill, BillItem, ReadResult, SpeechOnly
@@ -7,6 +10,23 @@ from ..services.phrases import qty, say_money, t
 
 router = APIRouter(tags=["read"])
 RETAKE_FIELDS = {"printed_total", "items"}
+
+
+def _from_context(raw: str) -> Optional[dict]:
+    """The document the app sent back with the question. On serverless hosting (Vercel) each request
+    can land on a different machine, so the app's copy is more reliable than server memory."""
+    if not raw:
+        return None
+    try:
+        c = json.loads(raw)
+        text = str(c.get("text") or "")
+        fields = c.get("fields") or {}
+        if not text and not fields:
+            return None
+        return {"doc_type": str(c.get("doc_type") or "document"), "text": text,
+                "fields": {str(k): str(v) for k, v in dict(fields).items()}}
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 def _item_line(item: BillItem, currency: str, lang: str) -> str:
@@ -31,7 +51,7 @@ async def read(file: UploadFile = File(...), lang: str = Form("en"), session_id:
     if ai.kind == "document":
         return ReadResult(
             kind="document", doc_type=ai.doc_type, speech=ai.summary_speech,
-            speech_more=ai.full_text, key_fields=fields, uncertain=ai.uncertain,
+            speech_more=ai.full_text, full_text=ai.full_text, key_fields=fields, uncertain=ai.uncertain,
         )
 
     # ---- bill: the AI only transcribed it; Python does every number ----
@@ -64,15 +84,16 @@ async def read(file: UploadFile = File(...), lang: str = Form("en"), session_id:
     session.update(session_id, bill_total=charged, currency=cur)
 
     return ReadResult(
-        kind="bill", doc_type=ai.doc_type, speech=speech, speech_more=more,
+        kind="bill", doc_type=ai.doc_type, speech=speech, speech_more=more, full_text=ai.full_text,
         key_fields=fields, bill=bill, uncertain=uncertain,
     )
 
 
 @router.post("/read/ask", response_model=SpeechOnly)
-async def ask(question: str = Form(...), lang: str = Form("en"), session_id: str = Form("")):
+async def ask(question: str = Form(...), lang: str = Form("en"), session_id: str = Form(""),
+              context: str = Form("")):
     lang = prompts.lang_code(lang)
-    doc = session.get(session_id)
+    doc = _from_context(context) or session.get(session_id)
     if not doc:
         return SpeechOnly(speech=t("no_doc", lang))
     fields = "\n".join(f"- {k}: {v}" for k, v in doc["fields"].items()) or "(none)"
