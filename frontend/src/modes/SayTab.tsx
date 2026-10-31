@@ -7,11 +7,13 @@ import Icon from '../components/Icon'
 type Group = 'walk' | 'read' | 'money'
 type Line = { key: string; group: Group | 'any'; cmd: Command; color: string }
 const LINES: Line[] = [
+  { key: 'sos', group: 'any', cmd: { cmd: 'sos' }, color: 'coral' },
   { key: 'ahead', group: 'walk', cmd: { cmd: 'ahead' }, color: 'purple' },
   { key: 'route', group: 'walk', cmd: { cmd: 'route', place: 'bus stand' }, color: 'blue' },
   { key: 'where', group: 'walk', cmd: { cmd: 'whereAmI' }, color: 'blue' },
   { key: 'sign', group: 'walk', cmd: { cmd: 'sign' }, color: 'green' },
   { key: 'bin', group: 'walk', cmd: { cmd: 'bin' }, color: 'green' },
+  { key: 'cab', group: 'walk', cmd: { cmd: 'cab' }, color: 'blue' },
   { key: 'findBin', group: 'walk', cmd: { cmd: 'findBin' }, color: 'green' },
   { key: 'read', group: 'read', cmd: { cmd: 'guide' }, color: 'purple' },
   { key: 'price', group: 'read', cmd: { cmd: 'guide' }, color: 'blue' },
@@ -19,6 +21,7 @@ const LINES: Line[] = [
   { key: 'count', group: 'money', cmd: { cmd: 'count' }, color: 'coral' },
   { key: 'paid', group: 'money', cmd: { cmd: 'paid', amount: 500 }, color: 'coral' },
   { key: 'change', group: 'money', cmd: { cmd: 'change' }, color: 'coral' },
+  { key: 'qr', group: 'money', cmd: { cmd: 'qr' }, color: 'green' },
   { key: 'note', group: 'money', cmd: { cmd: 'note' }, color: 'pink' },
   { key: 'repeat', group: 'any', cmd: { cmd: 'repeat' }, color: 'ink' },
   { key: 'stop', group: 'any', cmd: { cmd: 'stop' }, color: 'ink' },

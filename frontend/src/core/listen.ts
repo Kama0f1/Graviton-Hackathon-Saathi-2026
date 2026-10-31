@@ -6,7 +6,8 @@ import { LOCALE, getLang } from './settings'
 
 export type Command =
   | { cmd: 'navigate' | 'read' | 'home' | 'ahead' | 'sign' | 'bin' | 'findBin' | 'snap' | 'guide' | 'more'
-      | 'repeat' | 'stop' | 'count' | 'change' | 'note' | 'obstaclesOn' | 'obstaclesOff' | 'whereAmI' | 'directions' }
+      | 'repeat' | 'stop' | 'count' | 'change' | 'note' | 'obstaclesOn' | 'obstaclesOff' | 'whereAmI' | 'directions' | 'qr' | 'sos' }
+  | { cmd: 'cab'; plate?: string }
   | { cmd: 'paid'; amount: number }
   | { cmd: 'route'; place: string }
   | { cmd: 'ask'; text: string }
@@ -56,6 +57,8 @@ const FIND_BIN = /\b(where|where's|wheres|find|show|locate|search|look for|guide
 // Hinglish heard as English: "dustbin kahan hai", "kachra kidhar"
 const BIN_WHERE = /\b(bin|dustbin|kachra|kooda|kudedan)\b.*\b(kahan|kaha|kidhar|kithe|kitthe)\b/
 
+const CAB_PLATE = /(?:my (?:cab|car|taxi|auto|uber|ola|rapido|ride)(?: number)? is|(?:cab|car|taxi|auto|vehicle) number(?: is)?|number plate(?: is)?|plate number(?: is)?)\s+([a-z0-9 -]{4,})$/
+const CAB = /\b(my|is this my|find my|where is my|where's my)\s+(cab|taxi|auto|uber|ola|rapido|ride|car)\b|मेरी कैब|मेरी टैक्सी|मेरा ऑटो|ਮੇਰੀ ਕੈਬ|ਮੇਰਾ ਆਟੋ/
 const QUESTION = /^(what|when|who|how much|how many|which|why|is there|does|do i|can i|क्या|कब|कितना|कितने|कौन|किस|ਕੀ|ਕਦੋਂ|ਕਿੰਨਾ|ਕਿੰਨੇ|ਕੌਣ)/
 
 /** Parse one transcript. Returns null when it is not a known command (caller may treat it as a question). */
@@ -65,6 +68,14 @@ export function matchCommand(raw: string, mode: Mode, allowWeak = true): Command
   const n = words(s)
 
   if (FIND_BIN.test(s) || BIN_WHERE.test(s) || has(s, ['find bin', 'find the bin', 'where is the bin', 'nearest bin', 'डिब्बा कहाँ', 'डिब्बा कहां', 'डिब्बा ढूँढ', 'डिब्बा ढूंढ', 'डस्टबिन कहाँ', 'डस्टबिन कहां', 'कूड़ेदान कहाँ', 'ਡੱਬਾ ਕਿੱਥੇ', 'ਡੱਬਾ ਲੱਭ', 'ਡਸਟਬਿਨ ਕਿੱਥੇ'])) return { cmd: 'findBin' }
+  // SOS first: it must never be mistaken for anything else
+  if (has(s, ['help me', 'i need help', 'emergency', 'sos', 's o s', 'bachao', 'बचाओ', 'मदद करो', 'मदद चाहिए', 'ਬਚਾਓ', 'ਮਦਦ ਕਰੋ', 'ਮਦਦ ਚਾਹੀਦੀ'])) return { cmd: 'sos' }
+  // "my cab is PB 65 AB 1234" / "is this my auto" / "find my uber"
+  const cabPlate = s.match(CAB_PLATE)
+  if (cabPlate) return { cmd: 'cab', plate: cabPlate[1].replace(/[^a-z0-9]/g, '').toUpperCase() }
+  if (CAB.test(s)) return { cmd: 'cab' }
+  // UPI QR: "scan the QR", "who am I paying", "check this UPI"
+  if (has(s, ['qr', 'q r', 'qr code', 'scanner', 'upi', 'who am i paying', 'payment code', 'क्यूआर', 'क्यू आर', 'यूपीआई', 'ਕਿਊਆਰ', 'ਯੂਪੀਆਈ'])) return { cmd: 'qr' }
   // directions next: "go to ..." contains words that would otherwise look like other commands
   const place = routePlace(s)
   if (place) return { cmd: 'route', place }

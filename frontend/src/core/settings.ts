@@ -49,6 +49,14 @@ export const getSpeed = () => speed
 export function setObstacles(on: boolean) { obstacles = on; write('saathi.obstacles', on ? 'on' : 'off'); changed() }
 export function setHazards(on: boolean) { hazards = on; write('saathi.hazards', on ? 'on' : 'off'); changed() }
 export function setSpeed(s: Speed) { speed = s; write('saathi.speed', s); changed() }
+// SOS: one emergency contact (name + phone with country code) and shake-to-SOS
+export type Contact = { name: string; phone: string }
+let contact: Contact = (() => { try { return JSON.parse(read('saathi.sos', '{"name":"","phone":""}')) as Contact } catch { return { name: '', phone: '' } } })()
+let shake = read('saathi.shake', 'on') !== 'off'
+export const getContact = () => contact
+export const getShake = () => shake
+export function setContact(c: Contact) { contact = c; write('saathi.sos', JSON.stringify(c)); changed() }
+export function setShake(on: boolean) { shake = on; write('saathi.shake', on ? 'on' : 'off'); changed() }
 export function onSettings(fn: () => void) {
   settingListeners.add(fn)
   return () => { settingListeners.delete(fn) }

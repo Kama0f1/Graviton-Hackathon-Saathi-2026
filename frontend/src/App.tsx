@@ -9,7 +9,8 @@ import SettingsTab from './modes/SettingsTab'
 import Icon, { type IconName } from './components/Icon'
 import { onCaption, onVoiceIssue, repeat, say, stop, type Caption } from './core/speech'
 import { api, lastReply, onBusy } from './core/api'
-import { getLang, onLang, setLang, setObstacles, type Lang } from './core/settings'
+import { getContact, getLang, getShake, onLang, setLang, setObstacles, type Lang } from './core/settings'
+import { locateNow, sendSos, watchShake, type Fix } from './core/sos'
 import { canListen, listen, parseAlternatives, type Command } from './core/listen'
 import { haptics } from './core/haptics'
 import { beep, tick } from './core/audio'
@@ -22,8 +23,8 @@ const LANGS: { code: Lang; label: string; name: string }[] = [
   { code: 'hi', label: 'हिं', name: 'हिन्दी' },
   { code: 'pa', label: 'ਪੰ', name: 'ਪੰਜਾਬੀ' },
 ]
-const NAV_CMDS = new Set(['ahead', 'sign', 'bin', 'findBin', 'route', 'whereAmI', 'directions'])
-const READ_CMDS = new Set(['snap', 'guide', 'more', 'count', 'change', 'note', 'paid', 'ask'])
+const NAV_CMDS = new Set(['ahead', 'sign', 'bin', 'findBin', 'route', 'whereAmI', 'directions', 'cab'])
+const READ_CMDS = new Set(['snap', 'guide', 'more', 'count', 'change', 'note', 'paid', 'ask', 'qr'])
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('navigate')
@@ -36,6 +37,7 @@ export default function App() {
   const [shared, setShared] = useState<Blob | null>(null)
   const [server, setServer] = useState<'checking' | 'up' | 'down'>('checking')
   const [voiceIssue, setVoiceIssue] = useState<Lang | null>(null)
+  const [sos, setSos] = useState<{ fix: Fix; locating: boolean } | null>(null)
   const stopListening = useRef<(() => void) | null>(null)
   const cmdId = useRef(0)
   const mode = tab === 'navigate' || tab === 'read' ? tab : null // what the voice parser should assume
@@ -91,6 +93,23 @@ export default function App() {
     })
   }, [])
 
+  // SOS: full-screen "tap anywhere to send" (a web app needs one tap to open WhatsApp), location found meanwhile
+  const openSos = () => {
+    haptics.warning()
+    const c = getContact()
+    setSos({ fix: null, locating: true })
+    say(c.phone ? t('sosConfirm', { name: c.name || c.phone }) : t('sosNoContact'), 'alert')
+    void locateNow().then((fix) => setSos((s) => (s ? { fix, locating: false } : s)))
+  }
+  const fireSos = (via: 'whatsapp' | 'sms') => {
+    const fix = sos?.fix ?? null
+    setSos(null)
+    if (sendSos(fix, via)) say(t('sosOpened'), 'answer')
+    else say(t('sosShared'), 'answer')
+  }
+  const cancelSos = () => { setSos(null); say(t('sosCancelled'), 'info') }
+  useEffect(() => watchShake(() => { if (getShake()) openSos() }), []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const go = (x: Tab) => {
     haptics.tap()
     setCommand(null) // a freshly opened tab must not re-run the last voice command
@@ -109,7 +128,8 @@ export default function App() {
       case 'navigate': case 'home': go('navigate'); return
       case 'read': go('read'); return
       case 'repeat': repeat(); return
-      case 'stop': stop(); send(c); return
+      case 'sos': openSos(); return
+      case 'stop': stop(); if (sos) { cancelSos(); return } send(c); return
       case 'obstaclesOn': setObstacles(true); say(t('obstaclesOn'), 'info'); return
       case 'obstaclesOff': setObstacles(false); say(t('obstaclesOff'), 'info'); return
     }
@@ -179,8 +199,20 @@ export default function App() {
         {tab === 'navigate' && <NavigateMode command={command} />}
         {tab === 'read' && <ReadMode command={command} shared={shared} />}
         {tab === 'say' && <SayTab onTry={(c) => { haptics.tap(); handle(c) }} />}
-        {tab === 'settings' && <SettingsTab lang={lang} />}
+        {tab === 'settings' && <SettingsTab lang={lang} onSos={openSos} />}
       </main>
+
+      {sos && (
+        <div className="sos" role="dialog" aria-modal="true" aria-label="SOS">
+          <button type="button" className="sos-cancel" onClick={cancelSos}>{t('cancel')}</button>
+          <button type="button" className="sos-send" onClick={() => fireSos('whatsapp')}>
+            <b>SOS</b>
+            <span>{getContact().phone ? t('sosTap', { name: getContact().name || getContact().phone }) : t('sosTapShare')}</span>
+            <small>{sos.locating ? t('sosLocating') : sos.fix ? t('sosLocated', { m: sos.fix.acc }) : t('sosNoGps')}</small>
+          </button>
+          {getContact().phone && <button type="button" className="sos-sms" onClick={() => fireSos('sms')}>{t('sosSms')}</button>}
+        </div>
+      )}
 
       <div className="bottom">
         <div className={`caption ${caption.speaking && caption.priority === 'alert' ? 'alert' : ''}`}>

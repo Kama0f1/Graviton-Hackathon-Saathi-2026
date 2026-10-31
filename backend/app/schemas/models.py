@@ -102,3 +102,12 @@ class BinSpotResult(BaseModel):
     metres: float = 0
     color: str = ""
     speech: str = ""            # what to say: where the bin is, or "turn slowly"
+
+
+class CabResult(BaseModel):
+    match: bool = False
+    plate: str = ""                  # the matching plate as read
+    plates: list[str] = Field(default_factory=list)   # every readable plate in view
+    position: Literal["left", "ahead", "right"] = "ahead"
+    metres: float = 0
+    speech: str = ""

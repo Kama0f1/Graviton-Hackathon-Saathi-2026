@@ -13,6 +13,7 @@
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-webgl": "^4.22.0",
+    "jsqr": "^1.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

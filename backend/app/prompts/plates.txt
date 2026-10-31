@@ -1,0 +1,12 @@
+A blind person is waiting for a booked cab or auto rickshaw and points the phone camera at the vehicles around them.
+List every vehicle whose number plate you can see, nearest first (at most 5).
+
+For each vehicle:
+- `plate`: the number plate exactly as printed, letters and digits only, read carefully character by character
+  (Indian plates look like "PB 65 AB 1234", "DL 3C AB 1234" or "22 BH 1234 AA"). "" if the plate is not readable.
+- `kind`: car / auto (three-wheeler auto rickshaw) / bike / bus / truck / other.
+- `colour`: the vehicle's main colour in a word or two.
+- `position`: left / ahead / right in the picture.
+- `metres`: your best estimate of the distance (a car is about 1.5 m tall, an auto about 1.7 m).
+
+Only list what you can actually see. Never invent a plate. If no vehicle is visible, return an empty list.

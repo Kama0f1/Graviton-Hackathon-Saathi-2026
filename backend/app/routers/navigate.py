@@ -6,8 +6,8 @@ from pathlib import Path
 from fastapi import APIRouter, File, Form, UploadFile
 
 from ..config import GEMINI_GUIDANCE_MODEL
-from ..schemas import AIBinSpot, AIHazard, AIWaste, BinSpotResult, HazardResult, SignResult, SpeechOnly, WasteResult
-from ..services import gemini, groq, media, prompts
+from ..schemas import AIBinSpot, AIHazard, AIPlates, AIWaste, BinSpotResult, CabResult, HazardResult, SignResult, SpeechOnly, WasteResult
+from ..services import gemini, groq, media, plates as plate_match, prompts
 from ..services.errors import AIError
 from ..services.phrases import t
 
@@ -106,6 +106,34 @@ async def findbin(image: UploadFile = File(...), lang: str = Form("en"), color: 
     else:
         speech = t("bf_at", lang, thing=thing, pos=t("pos_" + ai.position, lang), d=say_metres(metres, lang))
     return BinSpotResult(found=True, position=ai.position, metres=metres, color=ai.color, speech=speech)
+
+
+@router.post("/cab", response_model=CabResult)
+async def cab(image: UploadFile = File(...), plate: str = Form(...), lang: str = Form("en"), session_id: str = Form("")):
+    """ "Is this my cab?": the AI reads the plates in view, Python matches them to the booked plate (tolerant of misreads)."""
+    lang = prompts.lang_code(lang)
+    data, mime = await media.read_upload(image, max_side=1280)  # plates are small: keep detail
+    prompt = prompts.load("plates", lang)
+    try:
+        ai = await gemini.ask(prompt, AIPlates, [(data, mime)], model=GEMINI_GUIDANCE_MODEL, timeout=8, fallback=False)
+    except AIError as exc:
+        if "rate limit" in str(exc) and groq.available([(data, mime)]):
+            ai = await groq.ask(prompt, AIPlates, [(data, mime)], timeout=8)
+        else:
+            raise
+    readable = [v for v in ai.vehicles if len(plate_match.clean(v.plate)) >= 4]
+    seen = [plate_match.clean(v.plate) for v in readable]
+    for v in readable:
+        if plate_match.same_plate(plate, v.plate):
+            m = max(0.0, min(50.0, float(v.metres)))
+            m = round(m * 2) / 2 if m < 2 else float(round(m))
+            speech = t("cab_yes", lang, colour=v.colour, kind=t("veh_" + v.kind, lang), plate=plate_match.spoken(v.plate),
+                       pos=t("pos_" + v.position, lang), d=say_metres(m, lang))
+            return CabResult(match=True, plate=plate_match.clean(v.plate), plates=seen, position=v.position, metres=m, speech=speech)
+    if readable:
+        listed = ", ".join(plate_match.spoken(p) for p in seen[:3])
+        return CabResult(plates=seen, speech=t("cab_no", lang, plates=listed))
+    return CabResult(speech=t("cab_unread" if ai.vehicles else "cab_none", lang))
 
 
 def say_metres(m: float, lang: str) -> str:

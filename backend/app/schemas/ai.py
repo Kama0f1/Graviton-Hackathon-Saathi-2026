@@ -97,3 +97,15 @@ class AIBinSpot(BaseModel):
     position: Literal["left", "ahead", "right"]
     metres: float                    # how far away; clamped and rounded in Python
     color: Literal["blue", "green", "red", "yellow", "grey", "black", "steel", "other"]
+
+
+class AIVehicle(BaseModel):
+    plate: str                       # number plate exactly as read, "" if not readable
+    kind: Literal["car", "auto", "bike", "bus", "truck", "other"]
+    colour: str
+    position: Literal["left", "ahead", "right"]
+    metres: float
+
+
+class AIPlates(BaseModel):
+    vehicles: List[AIVehicle]

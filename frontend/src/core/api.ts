@@ -30,6 +30,7 @@ export type ReadResult = {
   doc_type: string | null; key_fields: Record<string, string>
   bill: Bill | null; uncertain: string[]
 }
+export type CabResult = { match: boolean; plate: string; plates: string[]; position: 'left' | 'ahead' | 'right'; metres: number; speech: string }
 export type BinSpot = { found: boolean; position: 'left' | 'ahead' | 'right'; metres: number; color: string; speech: string }
 export type HazardResult = { hazard: string; position: 'left' | 'ahead' | 'right'; metres: number; urgent: boolean; speech: string }
 export type MoneyMode = 'count' | 'change' | 'check'
@@ -125,6 +126,7 @@ export const api = {
   guidance: (image: Blob, target: 'document' | 'bill' = 'document') =>
     json<GuidanceResult>(post('/guidance', { image, target }, { quiet: true, timeoutMs: 9000 })),
   // walking hazard check: quiet (no 'thinking' tick, no spoken errors), short timeout: the next frame is coming anyway
+  cab: (image: Blob, plate: string) => json<CabResult>(post('/cab', { image, plate }, { quiet: true, timeoutMs: 10000 })),
   findBin: (image: Blob, color?: string | null) =>
     json<BinSpot>(post('/findbin', { image, color: color ?? '' }, { quiet: true, timeoutMs: 8000 })),
   hazard: (image: Blob) => json<HazardResult>(post('/hazard', { image }, { quiet: true, timeoutMs: 7000 })),

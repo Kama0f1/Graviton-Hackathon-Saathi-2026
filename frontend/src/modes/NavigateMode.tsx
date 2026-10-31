@@ -17,13 +17,15 @@ import { useObstacles } from '../vision/detector'
 import { useHazardWatch } from '../vision/hazardWatch'
 import { type BinColor } from '../vision/binFinder'
 import { startAiBinFinder } from '../vision/aiBinFinder'
+import { startCabFinder } from '../vision/cabFinder'
+import type { CabResult } from '../core/api'
 import { getPosition, inMetres, rp, sayDist, startCompass, startDirections, whereAmI, type RouteView } from '../core/route'
 import { frame } from './useFrame'
 import { t } from '../i18n/phrases'
 
-type Tool = 'ahead' | 'sign' | 'bin' | 'route'
+type Tool = 'ahead' | 'sign' | 'bin' | 'route' | 'cab'
 const TOOL_OF: Partial<Record<Command['cmd'], Tool>> = {
-  ahead: 'ahead', sign: 'sign', bin: 'bin', findBin: 'bin', route: 'route', directions: 'route', whereAmI: 'route',
+  ahead: 'ahead', sign: 'sign', bin: 'bin', findBin: 'bin', route: 'route', directions: 'route', whereAmI: 'route', cab: 'cab',
 }
 const TURN_ICON: Record<string, IconName> = {
   '←': 'turnLeft', '↖': 'turnLeft', '↙': 'turnLeft', '→': 'turnRight', '↗': 'turnRight', '↘': 'turnRight',
@@ -40,6 +42,10 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
   const [finding, setFinding] = useState(false)
   const [route, setRoute] = useState<RouteView>({ status: 'idle' })
   const [dest, setDest] = useState('')
+  const [plate, setPlate] = useState(() => { try { return localStorage.getItem('saathi.cab') ?? '' } catch { return '' } })
+  const [cabbing, setCabbing] = useState(false)
+  const [cabSeen, setCabSeen] = useState<CabResult | null>(null)
+  const stopCab = useRef<(() => void) | null>(null)
   const total = useRef(0)               // route length at the start, for the progress dots
   const stopFinder = useRef<(() => void) | null>(null)
   const stopRoute = useRef<(() => void) | null>(null)
@@ -51,7 +57,7 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
 
   useEffect(() => {
     void cam.start()
-    return () => { stopFinder.current?.(); stopRoute.current?.(); cam.stop() }
+    return () => { stopFinder.current?.(); stopRoute.current?.(); stopCab.current?.(); cam.stop() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -64,7 +70,7 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
   const pick = (x: Tool) => {
     haptics.tap()
     setTool(x)
-    const name = { ahead: t('toolAhead'), sign: t('toolSign'), bin: t('toolBin'), route: t('toolRoute') }[x]
+    const name = { ahead: t('toolAhead'), sign: t('toolSign'), bin: t('toolBin'), route: t('toolRoute'), cab: t('toolCab') }[x]
     say(x === 'route' && !routing ? `${name}. ${rp('whereTo')}` : t('toolSet', { t: name }), 'info')
   }
 
@@ -89,6 +95,20 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
     stopFinder.current = startAiBinFinder(cam.grab, bin)
     setFinding(true)
   }
+  // "Is this my cab?": reads the plates in view until stopped
+  const findCab = (p = plate) => {
+    const clean = p.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+    setTool('cab')
+    if (cabbing && !p) { stopCab.current?.(); stopCab.current = null; setCabbing(false); setCabSeen(null); say(t('cabStop'), 'info'); return }
+    if (clean.length < 4) { say(t('cabAsk'), 'answer'); return }
+    setPlate(clean)
+    try { localStorage.setItem('saathi.cab', clean) } catch { /* ignore */ }
+    stopCab.current?.()
+    stopCab.current = startCabFinder(cam.grab, clean, setCabSeen)
+    setCabbing(true)
+  }
+  const stopCabbing = () => { stopCab.current?.(); stopCab.current = null; setCabbing(false); setCabSeen(null); say(t('cabStop'), 'info') }
+
   const go = (place: string) => {
     place = place.trim()
     if (!place) { say(rp('whereTo'), 'answer'); return }
@@ -127,7 +147,8 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
       case 'directions': if (routing) repeatStep(); else say(rp('whereTo'), 'answer'); break
       case 'whereAmI': void locate(); break
       case 'more': repeatStep(); break
-      case 'stop': if (finding) findBin(); if (routing) endRoute(); break
+      case 'cab': if (command.plate) findCab(command.plate); else if (!cabbing) { if (plate) findCab(plate); else say(t('cabAsk'), 'answer') } break
+      case 'stop': if (finding) findBin(); if (routing) endRoute(); if (cabbing) stopCabbing(); break
     }
   }, [command?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -170,15 +191,27 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
     </section>
   )
 
+  const cabCard = cabbing && (
+    <section className={`hero ${cabSeen?.match ? 'g-green' : 'g-blue'} cab-card`} aria-hidden="true">
+      <div className="hero-top">
+        <span className="hero-label">{t('cabLabel')}</span>
+        <span className="hero-tag plate">{plate}</span>
+      </div>
+      <p className="hero-headline">{cabSeen?.match ? t('cabFound') : cabSeen ? (cabSeen.plates.length ? t('cabNotYet') : t('cabNoPlate')) : t('cabSearching')}</p>
+      {cabSeen?.match && <span className="hero-detail">{t(cabSeen.position === 'ahead' ? 'centre' : cabSeen.position)} · {cabSeen.metres} m</span>}
+      {!cabSeen?.match && cabSeen && cabSeen.plates.length > 0 && <ul className="hero-chips">{cabSeen.plates.slice(0, 3).map((p) => <li key={p}>{p}</li>)}</ul>}
+    </section>
+  )
+
   return (
     <div className="mode camfirst">
       <CameraView cam={cam} canvasRef={canvasRef} chip={chip} chipTone={chipTone}
-        top={<>{routeCard}<ResultCard src={result} onClose={() => setResult(null)} /></>}
+        top={<>{routeCard}{cabCard}<ResultCard src={result} onClose={() => setResult(null)} /></>}
         bottom={hazardCard} />
 
       <Segmented label={t('navTitle')} value={tool} onChange={pick} items={[
         { id: 'ahead', label: t('toolAhead') }, { id: 'sign', label: t('toolSign') },
-        { id: 'bin', label: t('toolBin') }, { id: 'route', label: t('toolRoute') },
+        { id: 'bin', label: t('toolBin') }, { id: 'route', label: t('toolRoute') }, { id: 'cab', label: t('toolCab') },
       ]} />
 
       <div className="action-row">
@@ -200,6 +233,15 @@ export default function NavigateMode({ command }: { command: (Command & { id: nu
           </form>
         ))}
         {tool === 'route' && <button type="button" className="round big" onClick={() => void locate()} aria-label={t('whereAmI')}><Icon name="pin" /></button>}
+        {tool === 'cab' && (cabbing ? (
+          <button type="button" className="pill-btn on" onClick={stopCabbing}><Icon name="stop" />{t('cabStopBtn')}</button>
+        ) : (
+          <form className="ask" onSubmit={(e) => { e.preventDefault(); findCab(plate) }}>
+            <input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder={t('cabPlaceholder')} aria-label={t('cabPlaceholder')}
+              autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="search" />
+            <button type="submit" aria-label={t('cabFindBtn')}><Icon name="send" /></button>
+          </form>
+        ))}
       </div>
     </div>
   )

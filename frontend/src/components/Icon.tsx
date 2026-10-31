@@ -25,6 +25,8 @@ const P: Record<string, string> = {
   turnLeft: '<path d="M10 15l-5-5 5-5M19 20v-6a4 4 0 0 0-4-4H5" stroke-linejoin="round"/>',
   straight: '<path d="M12 20V4M6 10l6-6 6 6" stroke-linejoin="round"/>',
   uturn: '<path d="M9 20V9a5 5 0 0 1 10 0v3M5 16l4 4 4-4" stroke-linejoin="round"/>',
+  qr: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2M20 14v6h-6M17 17v3"/>',
+  sos: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5h.01"/>',
   flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
 }
 export type IconName = keyof typeof P

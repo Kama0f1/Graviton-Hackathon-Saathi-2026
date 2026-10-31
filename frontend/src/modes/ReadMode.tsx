@@ -13,6 +13,8 @@ import { startGuidance } from '../core/guidance'
 import { fromMoney, fromRead, fromSpeech, money, type ResultSrc, src } from '../core/result'
 import type { Command } from '../core/listen'
 import { frame } from './useFrame'
+import { startQrScan } from '../vision/qrScan'
+import { parseQr, sameShop, sayVpa } from '../core/upi'
 import { t } from '../i18n/phrases'
 
 const MAX_UPLOAD = 4 * 1024 * 1024  // hosting limit is 4.5 MB per request
@@ -35,7 +37,7 @@ async function fitUpload(file: Blob): Promise<Blob | null> {
 
 type Tool = 'doc' | 'money' | 'note' | 'ask'
 const TOOL_OF: Partial<Record<Command['cmd'], Tool>> = {
-  snap: 'doc', guide: 'doc', more: 'doc', count: 'money', change: 'money', paid: 'money', note: 'note', ask: 'ask',
+  snap: 'doc', guide: 'doc', more: 'doc', count: 'money', change: 'money', paid: 'money', note: 'note', ask: 'ask', qr: 'money',
 }
 
 export default function ReadMode({ command, shared }: {
@@ -54,8 +56,10 @@ export default function ReadMode({ command, shared }: {
   const paid = useRef<number | undefined>(undefined)
   const stopGuide = useRef<(() => void) | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [qr, setQr] = useState(false)
+  const stopQr = useRef<(() => void) | null>(null)
 
-  useEffect(() => { void cam.start(); return () => { stopGuide.current?.(); cam.stop() } }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void cam.start(); return () => { stopGuide.current?.(); stopQr.current?.(); cam.stop() } }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = async (fn: () => Promise<void>) => { try { await fn() } catch (e) { if (!(e instanceof ApiError)) console.error(e) } }
 
@@ -129,6 +133,47 @@ export default function ReadMode({ command, shared }: {
     if (mode === 'count') paid.current = r.paid ?? undefined
   })
 
+  // UPI QR safety check: who does this QR pay, does it match the bill's shop, how much does it ask for
+  const scanQr = () => {
+    if (qr) { stopQr.current?.(); stopQr.current = null; setQr(false); return }
+    const video = cam.videoRef.current
+    if (!video) return
+    setQr(true)
+    stopQr.current = startQrScan(video, (raw) => {
+      setQr(false); stopQr.current = null
+      const info = parseQr(raw)
+      const bill = lastRead.current?.bill
+      const shop = bill?.shop ?? ''
+      const billTotal = bill ? (bill.printed_total ?? bill.computed_total) : null
+      if (info.kind === 'upi') {
+        const who = info.name || sayVpa(info.vpa)
+        const parts = [t('qrPays', { name: who, vpa: sayVpa(info.vpa) })]
+        let warn = false
+        if (shop && !sameShop(shop, info.name, info.vpa)) { parts.unshift(t('qrMismatch', { shop, name: who })); warn = true }
+        else if (shop) parts.push(t('qrMatches'))
+        if (info.amount != null) {
+          if (billTotal != null && Math.abs(info.amount - billTotal) > 1) { parts.push(t('qrAmountDiff', { a: money(info.amount), b: money(billTotal) })); warn = true }
+          else parts.push(t('qrAmount', { a: money(info.amount) }))
+        }
+        parts.push(t('qrNeverReceive'))
+        const speech = parts.join(' ')
+        setResult(src(() => ({ tone: warn ? 'warning' : 'success', accent: warn ? 'coral' : 'green', label: t('qrLabel'),
+          headline: info.name || info.vpa, detail: speech,
+          chips: [info.vpa, ...(info.amount != null ? [money(info.amount)] : [])] })))
+        say(speech, warn ? 'alert' : 'answer')
+        if (warn) haptics.warning(); else haptics.success()
+      } else if (info.kind === 'url') {
+        const speech = t('qrNotUpi', { host: info.host })
+        setResult(src(() => ({ tone: 'warning', label: t('qrLabel'), headline: t('qrNotPayment'), detail: speech, chips: [info.host] })))
+        say(speech, 'alert'); haptics.warning()
+      } else {
+        const speech = t('qrText', { text: info.text })
+        setResult(src(() => ({ tone: 'info', label: t('qrLabel'), headline: info.text })))
+        say(speech, 'answer')
+      }
+    }, () => { setQr(false); stopQr.current = null })
+  }
+
   const pick = (x: Tool) => {
     haptics.tap()
     setTool(x)
@@ -149,14 +194,15 @@ export default function ReadMode({ command, shared }: {
       case 'note': void moneyCheck('check'); break
       case 'paid': paid.current = command.amount; say(t('paidSet', { n: money(command.amount) }), 'answer'); break
       case 'ask': void ask(command.text); break
-      case 'stop': if (guiding) guide(); break
+      case 'qr': if (!qr) scanQr(); break
+      case 'stop': if (guiding) guide(); if (qr) scanQr(); break
     }
   }, [command?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const busy = reading || guiding
   return (
     <div className="mode camfirst">
-      <CameraView cam={cam} chip={guiding ? t('scan') : undefined} overlay={
+      <CameraView cam={cam} chip={guiding ? t('scan') : qr ? t('qrLooking') : undefined} overlay={
         reading ? (
           <div className="scan-overlay reading" aria-hidden="true">
             {preview && <img src={preview} alt="" />}
@@ -189,6 +235,7 @@ export default function ReadMode({ command, shared }: {
           <>
             <button type="button" className="pill-btn" onClick={() => void moneyCheck('count')} disabled={busy}>{t('countBtn')}</button>
             <button type="button" className="pill-btn light" onClick={() => void moneyCheck('change')} disabled={busy}>{t('changeBtn')}</button>
+            <button type="button" className={`round big ${qr ? 'danger' : ''}`} onClick={scanQr} aria-pressed={qr} aria-label={t('qrBtn')}><Icon name={qr ? 'stop' : 'qr'} /></button>
           </>
         )}
         {tool === 'note' && <button type="button" className="pill-btn" onClick={() => void moneyCheck('check')} disabled={busy}><Icon name="eye" />{t('noteBtn')}</button>}
