@@ -7,7 +7,7 @@ how far away it is, and what is written on it, in **English, Hindi or Punjabi**.
 It answers by voice and vibration, so it works without looking at the screen.
 
 - **Backend health check:** https://saathibackend.vercel.app/health (should show `{"ok":true}`)
-- **Live app:** _add the frontend Vercel link here_
+- **Live app:** _https://saathifrontend.vercel.app/_
 - **Voice commands:** [docs/VOICE_COMMANDS.md](docs/VOICE_COMMANDS.md) · **Deploying:** [docs/DEPLOY.md](docs/DEPLOY.md)
 
 ---
